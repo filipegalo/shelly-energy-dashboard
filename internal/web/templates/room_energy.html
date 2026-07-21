@@ -1,0 +1,516 @@
+{{define "energy-subnav"}}
+<nav class="energy-subnav" aria-label="Energy sections">
+  <a href="/energy" class="{{if eq .Page "energy"}}active{{end}}">Whole house</a>
+  <a href="/energy/rooms" class="{{if or (eq .Page "energy-rooms") (eq .Page "energy-room")}}active{{end}}">Rooms</a>
+  <a href="/energy/rooms/reconciliation" class="{{if eq .Page "energy-reconciliation"}}active{{end}}">Reconciliation</a>
+  <a href="/energy/rooms/settings" class="{{if eq .Page "energy-room-settings"}}active{{end}}">Room metering</a>
+  <a href="/energy/settings" class="{{if eq .Page "energy-settings"}}active{{end}}">Whole-house settings</a>
+</nav>
+{{end}}
+
+{{define "room-energy-feedback"}}
+{{if .Error}}<div class="room-energy-notice is-error" role="alert">{{.Error}}</div>{{end}}
+{{if .RoomEnergy.Message}}<div class="room-energy-notice" role="status">{{.RoomEnergy.Message}}</div>{{end}}
+{{end}}
+
+{{define "energy-rooms"}}
+{{template "energy-subnav" .}}
+{{template "room-energy-feedback" .}}
+
+<section class="room-energy-heading">
+  <div>
+    <p class="eyebrow">WHOLE-HOUSE ALLOCATION</p>
+    <h2>Energy by room</h2>
+    <p>Room meters are reconciled against the whole-house meter. Missing readings remain gaps, never assumed zero.</p>
+  </div>
+  <div class="room-energy-heading-actions">
+    <a class="button secondary" href="/energy/rooms/reconciliation">Review reconciliation</a>
+    <a class="button primary" href="/energy/rooms/settings">Configure room meters</a>
+  </div>
+</section>
+
+{{if not .RoomEnergy.Configured}}
+<section class="panel room-energy-onboarding">
+  <p class="eyebrow">MAIN METER REQUIRED</p>
+  <h3>Configure the whole-house source of truth</h3>
+  <p>Room allocation, unmetered energy, and reconciliation need a tested whole-house meter. You can prepare room sources now, then return when the main meter is collecting.</p>
+  <div><a class="button primary" href="/energy/settings">Configure main meter</a><a class="button secondary" href="/energy/rooms/settings">Prepare room sources</a></div>
+</section>
+{{else}}
+
+<section class="room-energy-summary" aria-label="Whole-house room summary">
+  <article class="panel room-energy-stat"><span>Whole-house power</span><strong>{{.RoomEnergy.Overview.WholeHousePower}}</strong><small>Current main-meter reading</small></article>
+  <article class="panel room-energy-stat"><span>Room power</span><strong>{{.RoomEnergy.Overview.RoomPower}}</strong><small>Fresh primary sources only</small></article>
+  <article class="panel room-energy-stat"><span>Whole-house today</span><strong>{{.RoomEnergy.Overview.WholeHouseToday}}</strong><small>Main meter</small></article>
+  <article class="panel room-energy-stat"><span>Measured rooms today</span><strong>{{.RoomEnergy.Overview.RoomToday}}</strong><small>Root primary sources</small></article>
+  <article class="panel room-energy-stat"><span>Unmetered today</span><strong>{{.RoomEnergy.Overview.UnmeteredToday}}</strong><small>Not covered by room meters</small></article>
+  <article class="panel room-energy-stat"><span>Room-meter coverage</span><strong>{{.RoomEnergy.Overview.Coverage}}</strong><small>Of whole-house consumption</small></article>
+  <article class="panel room-energy-stat"><span>Reconciliation</span><strong class="room-energy-quality quality-{{.RoomEnergy.Overview.Quality}}">{{.RoomEnergy.Overview.Status}}</strong><small>{{.RoomEnergy.Overview.Quality}}</small></article>
+  <article class="panel room-energy-stat"><span>Whole-house variable cost</span><strong>{{.RoomEnergy.Overview.WholeHouseCost}}</strong><small>Contract-level estimate</small></article>
+  <article class="panel room-energy-stat"><span>Total room allocation</span><strong>{{.RoomEnergy.Overview.RoomCost}}</strong><small>Allocated variable energy cost</small></article>
+  <article class="panel room-energy-stat"><span>Unmetered allocation</span><strong>{{.RoomEnergy.Overview.UnmeteredCost}}</strong><small>Allocated variable energy cost</small></article>
+</section>
+
+<section class="room-energy-card-grid" aria-label="Metered rooms">
+  {{range .RoomEnergy.Rooms}}
+  <article class="panel room-energy-card quality-border-{{.Quality}}" data-room-card data-room-id="{{.ID}}">
+    <header>
+      <div class="room-energy-card-title"><span class="room-energy-icon" aria-hidden="true">{{.Icon}}</span><div><h3><a href="/energy/rooms/{{.ID}}">{{.Name}}</a></h3>{{if .Archived}}<span class="room-energy-tag">Archived</span>{{end}}</div></div>
+      <span class="room-energy-quality quality-{{.Quality}}" data-room-quality>{{.Quality}}</span>
+    </header>
+    <dl class="room-energy-card-facts">
+      <div><dt>Current power</dt><dd data-room-current-power>{{.CurrentPower}}</dd></div>
+      <div><dt>Today</dt><dd>{{.TodayEnergy}}</dd></div>
+      <div><dt>Allocated cost today</dt><dd>{{.TodayCost}}</dd></div>
+      <div><dt>Billing cycle</dt><dd>{{.BillingEnergy}}</dd></div>
+      <div><dt>Allocated billing-cycle cost</dt><dd>{{.BillingCost}}</dd></div>
+      <div><dt>House share</dt><dd>{{.HouseShare}}</dd></div>
+    </dl>
+    <footer><span data-room-sources>{{.ReportingSources}} of {{.ExpectedSources}} sources reporting</span><time data-room-last-update>{{.LastUpdate}}</time></footer>
+  </article>
+  {{else}}
+  <article class="panel room-energy-empty"><h3>No room meters configured</h3><p>Assign a tested Shelly component to a room to begin collecting room history.</p><a class="button primary" href="/energy/rooms/settings">Configure room metering</a></article>
+  {{end}}
+
+  {{with .RoomEnergy.Unmetered}}
+  <article class="panel room-energy-card room-energy-unmetered quality-border-{{.Quality}}" data-room-card data-room-virtual="true">
+    <header>
+      <div class="room-energy-card-title"><span class="room-energy-icon" aria-hidden="true">∑</span><div><h3>Unmetered / Other</h3><span class="room-energy-tag">Calculated bucket</span></div></div>
+      <span class="room-energy-quality quality-{{.Quality}}">{{.Quality}}</span>
+    </header>
+    <dl class="room-energy-card-facts">
+      <div><dt>Current power</dt><dd>{{.CurrentPower}}</dd></div>
+      <div><dt>Today</dt><dd>{{.TodayEnergy}}</dd></div>
+      <div><dt>Allocated cost today</dt><dd>{{.TodayCost}}</dd></div>
+      <div><dt>Billing cycle</dt><dd>{{.BillingEnergy}}</dd></div>
+      <div><dt>Allocated billing-cycle cost</dt><dd>{{.BillingCost}}</dd></div>
+      <div><dt>Not covered</dt><dd>{{.HouseShare}}</dd></div>
+    </dl>
+    <footer><span>Difference from the main meter</span><time>{{.LastUpdate}}</time></footer>
+  </article>
+  {{end}}
+</section>
+
+<section class="room-energy-overview-grid">
+  <article class="panel room-energy-chart-panel">
+    <div class="panel-head room-energy-chart-head">
+      <div><p class="eyebrow">COMPARISON</p><h3>Rooms over time</h3></div>
+      <label class="room-energy-mode">Display
+        <select data-room-chart-mode aria-label="Chart display mode">
+          <option value="consumption">Consumption</option>
+          <option value="allocated_cost">Allocated cost</option>
+          <option value="average_power">Average power</option>
+          <option value="peak_power">Peak power</option>
+          <option value="house_share">House share</option>
+        </select>
+      </label>
+    </div>
+    {{template "room-energy-range-controls" .}}
+    <p class="room-energy-chart-status" data-room-chart-status role="status">Loading room history…</p>
+    <div class="room-energy-chart-wrap"><canvas id="room-energy-overview-chart" data-room-energy-chart data-chart-kind="overview" data-endpoint="/energy/rooms/chart" aria-label="Room energy comparison chart" role="img"></canvas></div>
+    <p class="room-energy-footnote">Gaps indicate missing readings. Unmetered / Other is derived from the whole-house meter and is not an editable room.</p>
+  </article>
+
+  <article class="panel room-energy-ranking">
+    <div class="panel-head"><div><p class="eyebrow">RANKING</p><h3>Room comparison</h3></div></div>
+    <label>Rank by
+      <select data-room-ranking>
+        <option value="billingEnergy">Consumption this billing cycle</option>
+        <option value="todayEnergy">Consumption today</option>
+        <option value="todayCost">Allocated cost today</option>
+        <option value="billingCost">Allocated cost this billing cycle</option>
+        <option value="currentPower">Current power</option>
+        <option value="peakPower">Peak power</option>
+      </select>
+    </label>
+    <ol data-room-ranking-list>
+      {{range .RoomEnergy.Rooms}}
+      <li data-ranking-item data-current-power="{{.CurrentPower}}" data-peak-power="{{.PeakPower}}" data-today-energy="{{.TodayEnergy}}" data-today-cost="{{.TodayCost}}" data-billing-energy="{{.BillingEnergy}}" data-billing-cost="{{.BillingCost}}" data-quality="{{.Quality}}">
+        <a href="/energy/rooms/{{.ID}}"><span>{{.Name}}{{if .Archived}} <small>(archived)</small>{{end}}</span><strong data-ranking-value>{{.BillingEnergy}}</strong></a>
+      </li>
+      {{end}}
+      {{with .RoomEnergy.Unmetered}}
+      <li data-ranking-item data-current-power="{{.CurrentPower}}" data-peak-power="{{.PeakPower}}" data-today-energy="{{.TodayEnergy}}" data-today-cost="{{.TodayCost}}" data-billing-energy="{{.BillingEnergy}}" data-billing-cost="{{.BillingCost}}" data-quality="{{.Quality}}">
+        <span><span>Unmetered / Other</span><strong data-ranking-value>{{.BillingEnergy}}</strong></span>
+      </li>
+      {{end}}
+    </ol>
+    <p class="room-energy-footnote">Rooms with completely missing data are kept out of the numeric ranking.</p>
+  </article>
+</section>
+
+<script defer src="/static/js/chart.umd.js"></script>
+<script defer src="/static/js/room-energy.js"></script>
+{{end}}
+{{end}}
+
+{{define "room-energy-range-controls"}}
+<div class="room-energy-range-row">
+  <div class="energy-range room-energy-range" role="group" aria-label="Chart range">
+    <button type="button" data-room-range="24h" class="{{if eq .RoomEnergy.SelectedRange "24h"}}active{{end}}">24h</button>
+    <button type="button" data-room-range="7d" class="{{if eq .RoomEnergy.SelectedRange "7d"}}active{{end}}">7d</button>
+    <button type="button" data-room-range="30d" class="{{if eq .RoomEnergy.SelectedRange "30d"}}active{{end}}">30d</button>
+    <button type="button" data-room-range="billing" class="{{if eq .RoomEnergy.SelectedRange "billing"}}active{{end}}">Billing cycle</button>
+    <button type="button" data-room-range="previous_billing" class="{{if eq .RoomEnergy.SelectedRange "previous_billing"}}active{{end}}">Previous cycle</button>
+    <button type="button" data-room-range="month" class="{{if eq .RoomEnergy.SelectedRange "month"}}active{{end}}">Month</button>
+  </div>
+  <form class="room-energy-custom-range" data-room-custom-range>
+    <label>From<input type="date" name="start" required></label>
+    <label>To<input type="date" name="end" required></label>
+    <button class="button secondary">Apply</button>
+  </form>
+</div>
+{{end}}
+
+{{define "energy-room"}}
+{{template "energy-subnav" .}}
+{{template "room-energy-feedback" .}}
+
+<section class="room-energy-heading">
+  <div>
+    <p class="eyebrow">ROOM ENERGY</p>
+    <h2><span aria-hidden="true">{{.RoomEnergy.Room.Icon}}</span> {{.RoomEnergy.Room.Name}}</h2>
+    <p>Primary meters set the room total. Submeters remain visible below their parent without being counted twice.</p>
+  </div>
+  <div class="room-energy-heading-actions"><a class="button secondary" href="/energy/rooms">All rooms</a><a class="button primary" href="/energy/rooms/settings">Manage sources</a></div>
+</section>
+{{if .RoomEnergy.Room.Archived}}<div class="room-energy-notice is-warning" role="status">This room is archived. Its historical attribution is preserved.</div>{{end}}
+
+{{if not .RoomEnergy.Configured}}
+<section class="panel room-energy-onboarding">
+  <p class="eyebrow">MAIN METER REQUIRED</p><h3>Configure whole-house energy first</h3>
+  <p>The room source tree can be prepared in Room metering, but energy share, cost allocation, and historical comparison require the whole-house main meter.</p>
+  <div><a class="button primary" href="/energy/settings">Configure main meter</a><a class="button secondary" href="/energy/rooms/settings">Manage room sources</a></div>
+</section>
+{{else}}
+
+<section class="room-energy-summary room-energy-room-summary" aria-label="Room energy summary">
+  <article class="panel room-energy-stat"><span>Current power</span><strong data-room-current-power data-room-id="{{.RoomEnergy.Room.ID}}">{{.RoomEnergy.Room.CurrentPower}}</strong><small>{{.RoomEnergy.Room.LastUpdate}}</small></article>
+  <article class="panel room-energy-stat"><span>Energy today</span><strong>{{.RoomEnergy.Room.TodayEnergy}}</strong><small>{{.RoomEnergy.Room.ReportingSources}} of {{.RoomEnergy.Room.ExpectedSources}} sources reporting</small></article>
+  <article class="panel room-energy-stat"><span>Allocated cost today</span><strong>{{.RoomEnergy.Room.TodayCost}}</strong><small>Allocated variable energy cost</small></article>
+  <article class="panel room-energy-stat"><span>This week</span><strong>{{.RoomEnergy.Room.WeekEnergy}}</strong><small>Measured energy</small></article>
+  <article class="panel room-energy-stat"><span>This month</span><strong>{{.RoomEnergy.Room.MonthEnergy}}</strong><small>Calendar month</small></article>
+  <article class="panel room-energy-stat"><span>Billing cycle</span><strong>{{.RoomEnergy.Room.BillingEnergy}}</strong><small>{{.RoomEnergy.Room.BillingCost}} allocated</small></article>
+  <article class="panel room-energy-stat"><span>House share</span><strong>{{.RoomEnergy.Room.HouseShare}}</strong><small>Billing-cycle consumption</small></article>
+  <article class="panel room-energy-stat"><span>Peak power</span><strong>{{.RoomEnergy.Room.PeakPower}}</strong><small>Selected reporting period</small></article>
+  <article class="panel room-energy-stat"><span>Data coverage</span><strong>{{.RoomEnergy.Room.Coverage}}</strong><small class="room-energy-quality quality-{{.RoomEnergy.Room.Quality}}">{{.RoomEnergy.Room.Quality}}</small></article>
+  <article class="panel room-energy-stat"><span>Reconciliation</span><strong>{{.RoomEnergy.Room.ReconciliationStatus}}</strong><small>Against whole-house consumption</small></article>
+</section>
+
+<section class="panel room-energy-chart-panel">
+  <div class="panel-head room-energy-chart-head">
+    <div><p class="eyebrow">HISTORY</p><h3>{{.RoomEnergy.Room.Name}} energy and allocation</h3></div>
+    <div class="room-energy-chart-options">
+      <label>Display<select data-room-chart-mode><option value="consumption">Consumption + cost</option><option value="allocated_cost">Allocated cost</option><option value="average_power">Average power</option><option value="peak_power">Peak power</option><option value="house_share">House share</option></select></label>
+      <label class="check"><input type="checkbox" data-room-house-comparison checked> Compare whole house</label>
+    </div>
+  </div>
+  {{template "room-energy-range-controls" .}}
+  <p class="room-energy-chart-status" data-room-chart-status role="status">Loading room history…</p>
+  <div class="room-energy-chart-wrap"><canvas id="room-energy-detail-chart" data-room-energy-chart data-chart-kind="room" data-endpoint="/energy/rooms/{{.RoomEnergy.Room.ID}}/chart" aria-label="{{.RoomEnergy.Room.Name}} energy and allocated variable cost chart" role="img"></canvas></div>
+  <p class="room-energy-footnote">Allocated variable energy cost is derived from the whole-house estimate; VAT allowances are not recalculated for this room.</p>
+</section>
+
+<section class="room-energy-detail-grid">
+  <article class="panel room-energy-sources">
+    <div class="panel-head"><div><p class="eyebrow">SOURCE TREE</p><h3>Meters and submeters</h3></div><span class="room-energy-quality quality-{{.RoomEnergy.Room.Quality}}">{{.RoomEnergy.Room.Quality}}</span></div>
+    <div class="room-energy-source-list">
+      {{range .RoomEnergy.Room.Sources}}{{template "room-energy-source" .}}{{else}}<p class="empty">No energy sources overlap this period.</p>{{end}}
+    </div>
+  </article>
+  <article class="panel room-energy-cost-card">
+    <div class="panel-head"><div><p class="eyebrow">ALLOCATION</p><h3>Room cost breakdown</h3></div></div>
+    <dl class="room-energy-cost-list">
+      <div><dt>Room measured energy</dt><dd>{{.RoomEnergy.Room.Cost.MeasuredEnergy}}</dd></div>
+      <div><dt>Room share of whole-house energy</dt><dd>{{.RoomEnergy.Room.Cost.HouseShare}}</dd></div>
+      <div><dt>Whole-house variable cost</dt><dd>{{.RoomEnergy.Room.Cost.WholeHouseCost}}</dd></div>
+      <div class="total"><dt><span>Allocated variable energy cost</span><button type="button" class="room-energy-help" title="Room costs are allocated from the whole-house variable energy estimate based on each room’s measured energy share. VAT allowances apply to the whole electricity contract, not separately to each room." aria-label="How room cost allocation works">?</button></dt><dd>{{.RoomEnergy.Room.Cost.AllocatedCost}}</dd></div>
+      <div><dt>Allocation method</dt><dd>{{.RoomEnergy.Room.Cost.AllocationMethod}}</dd></div>
+      <div><dt>Data quality</dt><dd>{{.RoomEnergy.Room.Cost.Quality}}</dd></div>
+      <div><dt>Reconciliation</dt><dd>{{.RoomEnergy.Room.Cost.ReconciliationStatus}}</dd></div>
+    </dl>
+    {{if .RoomEnergy.Room.Cost.Normalized}}<div class="room-energy-notice is-warning">Cost allocation was normalized because room meters exceeded the whole-house meter.</div>{{end}}
+    <p class="room-energy-footnote">VAT and electricity pricing are calculated once for the whole electricity contract. This estimate excludes the same fixed charges excluded by the whole-house dashboard.</p>
+  </article>
+</section>
+
+<script defer src="/static/js/chart.umd.js"></script>
+<script defer src="/static/js/room-energy.js"></script>
+{{end}}
+{{end}}
+
+{{define "room-energy-source"}}
+<article class="room-energy-source role-{{.Role}} quality-border-{{.Quality}}" data-assignment-id="{{.AssignmentID}}">
+  <header>
+    <div><h4>{{.DisplayName}}</h4><p>{{.DeviceName}} · {{.DeviceModel}} · <code>{{.ComponentKey}}</code></p></div>
+    <div class="room-energy-source-badges"><span class="room-energy-tag">{{.Role}}</span><span class="room-energy-quality quality-{{.Quality}}" data-source-status>{{.OnlineState}}</span></div>
+  </header>
+  <dl>
+    <div><dt>Current power</dt><dd data-source-current-power>{{.CurrentPower}}</dd></div>
+    <div><dt>Today</dt><dd>{{.TodayEnergy}}</dd></div>
+    <div><dt>Billing cycle</dt><dd>{{.BillingEnergy}}</dd></div>
+    <div><dt>Freshness</dt><dd data-source-freshness>{{.Freshness}}</dd></div>
+    {{if .ParentName}}<div><dt>Parent source</dt><dd>{{.ParentName}}</dd></div>{{end}}
+    {{if .ParentShare}}<div><dt>Share of parent</dt><dd>{{.ParentShare}}</dd></div>{{end}}
+    {{if .RoomShare}}<div><dt>Share of room</dt><dd>{{.RoomShare}}</dd></div>{{end}}
+  </dl>
+  {{if .Overlap}}<div class="room-energy-notice is-warning">Configured submeters exceed their parent meter. The room total is unchanged; review the hierarchy for overlap.</div>{{end}}
+  {{if .OtherUsage}}<p class="room-energy-remainder"><strong>Other usage on this circuit</strong><span>{{.OtherUsage}}</span><small>Informational remainder, not another physical meter.</small></p>{{end}}
+  {{if .Children}}<div class="room-energy-children" aria-label="Submeters of {{.DisplayName}}">{{range .Children}}{{template "room-energy-source" .}}{{end}}</div>{{end}}
+</article>
+{{end}}
+
+{{define "energy-room-settings"}}
+{{template "energy-subnav" .}}
+{{template "room-energy-feedback" .}}
+
+<section class="room-energy-heading">
+  <div><p class="eyebrow">ROOM METERING</p><h2>Assign Shelly components to rooms</h2><p>Discover components only when needed, test the exact source, then save its stable device and component identity.</p></div>
+  <a class="button secondary" href="/energy/rooms">Back to room energy</a>
+</section>
+{{if .RoomEnergy.Settings.Test.Attempted}}<div class="room-energy-standalone-test">{{template "room-energy-test-result" .}}</div>{{end}}
+
+<section class="room-energy-settings-grid">
+  <article class="panel room-energy-device-picker">
+    <div class="panel-head"><div><p class="eyebrow">ENERGY-CAPABLE DEVICES</p><h3>Discover and assign a component</h3></div></div>
+    <p class="room-energy-footnote">The server contacts a device only after you choose Discover components. Credentials never appear in this page.</p>
+    <div class="room-energy-device-list">
+      {{range .RoomEnergy.Settings.Devices}}
+      <details class="room-energy-device">
+        <summary>
+          <span><strong>{{.Name}}</strong><small>{{.Model}} · {{.IPAddress}}</small></span>
+          <span class="{{statusClass .OnlineStatus}}">{{.OnlineStatus}}</span>
+        </summary>
+        <form method="post" action="/energy/rooms/devices/{{.ID}}/components/discover" hx-post="/energy/rooms/devices/{{.ID}}/components/discover" hx-target="#room-energy-components-{{.ID}}" hx-swap="innerHTML" hx-indicator="#room-energy-discovering-{{.ID}}">
+          <input type="hidden" name="_csrf" value="{{$.CSRF}}">
+          <button class="button secondary">Discover components</button>
+          <span id="room-energy-discovering-{{.ID}}" class="htmx-indicator">Contacting device…</span>
+        </form>
+        <div id="room-energy-components-{{.ID}}" class="room-energy-component-list" aria-live="polite">
+          {{if eq $.RoomEnergy.Settings.Discovery.DeviceID .ID}}{{template "room-energy-discovery" $}}{{end}}
+        </div>
+      </details>
+      {{else}}<p class="empty">No discovered devices advertise usable power or energy capabilities. Run a network scan first.</p>{{end}}
+    </div>
+  </article>
+
+  <article class="panel room-energy-tolerance">
+    <div class="panel-head"><div><p class="eyebrow">RECONCILIATION</p><h3>Tolerance and collection</h3></div><a href="/energy/rooms/reconciliation">View diagnostics</a></div>
+    <form class="stack" method="post" action="/energy/rooms/reconciliation/settings">
+      <input type="hidden" name="_csrf" value="{{.CSRF}}">
+      <label>Relative tolerance (%)<input name="relative_tolerance_percent" inputmode="decimal" min="0" max="100" step="0.01" value="{{.RoomEnergy.Settings.Config.RelativeTolerancePercent}}" required></label>
+      <label>Absolute tolerance (kWh per interval)<input name="absolute_tolerance_kwh" inputmode="decimal" min="0" step="0.001" value="{{.RoomEnergy.Settings.Config.AbsoluteToleranceKWh}}" required></label>
+      <label class="check"><input type="checkbox" name="diagnostic_collection" {{if .RoomEnergy.Settings.Config.DiagnosticCollection}}checked{{end}}> Collect excluded sources for diagnostics</label>
+      <button class="button primary">Save reconciliation settings</button>
+    </form>
+    <p class="room-energy-footnote">A mismatch is accepted when it is inside either tolerance. Measurements remain visible even when reconciliation warns.</p>
+  </article>
+</section>
+
+<section class="panel room-energy-assignments">
+  <div class="panel-head"><div><p class="eyebrow">EFFECTIVE-DATED HISTORY</p><h3>Room energy assignments</h3></div><span>{{len .RoomEnergy.Settings.Assignments}} records</span></div>
+  <div class="room-energy-assignment-list">
+    {{range .RoomEnergy.Settings.Assignments}}
+    {{$assignment := .}}
+    <details class="room-energy-assignment state-{{.State}}" {{if or (eq .State "active") (eq .State "Active")}}open{{end}}>
+      <summary>
+        <span><strong>{{.DisplayName}}</strong><small>{{.DeviceName}} · {{.ComponentKey}} → {{.RoomName}}</small></span>
+        <span class="room-energy-assignment-badges"><span class="room-energy-tag">{{.Role}}</span><span class="room-energy-tag state">{{.State}}</span></span>
+      </summary>
+      <div class="room-energy-assignment-body">
+        <dl class="room-energy-assignment-facts">
+          <div><dt>Device</dt><dd>{{.DeviceModel}} · {{.IPAddress}}</dd></div>
+          <div><dt>Component</dt><dd><code>{{.ComponentType}} · {{.ComponentKey}}</code></dd></div>
+          <div><dt>Room</dt><dd>{{.RoomName}}</dd></div>
+          <div><dt>Collection</dt><dd>{{if .Enabled}}Enabled · every {{.PollIntervalSeconds}}s{{else}}Disabled{{end}}</dd></div>
+          <div><dt>Effective from</dt><dd>{{formatTime .EffectiveFrom}}</dd></div>
+          <div><dt>Effective to</dt><dd>{{formatTimePtr .EffectiveTo}}</dd></div>
+          {{if .ParentName}}<div><dt>Parent</dt><dd>{{.ParentName}}</dd></div>{{end}}
+        </dl>
+
+        <form class="room-energy-inline-form" method="post" action="/energy/rooms/assignments/{{.ID}}/test" hx-post="/energy/rooms/assignments/{{.ID}}/test" hx-target="next .room-energy-test-result" hx-swap="innerHTML">
+          <input type="hidden" name="_csrf" value="{{$.CSRF}}"><button class="button secondary">Test exact component</button>
+        </form>
+        <div class="room-energy-test-result" aria-live="polite"></div>
+
+        {{if .CanEdit}}
+        <details class="room-energy-assignment-action"><summary>Revise future settings</summary>
+          <form class="form-grid room-energy-revision-form" method="post" action="/energy/rooms/assignments/{{.ID}}/update">
+            <input type="hidden" name="_csrf" value="{{$.CSRF}}"><input type="hidden" name="room_id" value="{{.RoomID}}">
+            <label>Display name<input name="display_name" maxlength="100" value="{{.DisplayName}}" required></label>
+            <label>Aggregation role<select name="aggregation_role" data-room-role required><option value="primary" {{if eq .Role "primary"}}selected{{end}}>Primary</option><option value="submeter" {{if eq .Role "submeter"}}selected{{end}}>Submeter</option><option value="excluded" {{if eq .Role "excluded"}}selected{{end}}>Excluded</option></select></label>
+            <label data-room-parent-field>Parent primary meter<select name="parent_assignment_id"><option value="0">Choose a parent</option>{{range .Parents}}<option value="{{.ID}}" {{if eq .ID $assignment.ParentAssignmentID}}selected{{end}}>{{.Name}}</option>{{end}}</select></label>
+            <label>Poll interval (seconds)<input type="number" name="poll_interval_seconds" min="5" max="300" value="{{.PollIntervalSeconds}}"></label>
+            {{template "room-energy-effective-fields" $}}
+            <input type="hidden" name="enabled_present" value="1"><label class="check"><input type="checkbox" name="enabled" {{if .Enabled}}checked{{end}}> Enable collection</label>
+            <label class="check"><input type="checkbox" name="main_meter_acknowledged" {{if .MainMeter}}checked{{end}}> I understand the whole-house meter warning</label>
+            <button class="button primary">Save effective-dated revision</button>
+          </form>
+        </details>
+
+        {{if eq .Role "submeter"}}
+        <div class="room-energy-notice is-warning">A submeter cannot move away from its parent. Change its role or parent hierarchy in an effective-dated revision first.</div>
+        {{else}}<details class="room-energy-assignment-action"><summary>Move to another room</summary>
+          <form class="form-grid" method="post" action="/energy/rooms/assignments/{{.ID}}/move">
+            <input type="hidden" name="_csrf" value="{{$.CSRF}}"><label>Destination room<select name="room_id" required>{{range $.RoomEnergy.Settings.Rooms}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></label>{{template "room-energy-effective-fields" $}}<button class="button secondary">Schedule room move</button>
+          </form>
+          <p class="room-energy-footnote">Earlier energy remains attributed to {{.RoomName}}.</p>
+        </details>{{end}}
+        {{end}}
+
+        <div class="room-energy-destructive-actions">
+          {{if .CanDisable}}<details class="room-energy-assignment-action"><summary>Disable future collection</summary><form class="stack confirm-form" data-confirm="Disable this source from the selected effective time? Historical readings and attribution are retained." method="post" action="/energy/rooms/assignments/{{.ID}}/disable"><input type="hidden" name="_csrf" value="{{$.CSRF}}">{{template "room-energy-effective-fields" $}}<button class="button danger">Schedule disable</button></form></details>{{end}}
+          {{if .CanDeleteFuture}}<form class="confirm-form" data-confirm="Remove this future assignment? No historical record has started yet." method="post" action="/energy/rooms/assignments/{{.ID}}/delete-future"><input type="hidden" name="_csrf" value="{{$.CSRF}}"><button class="button danger">Remove future assignment</button></form>{{end}}
+        </div>
+      </div>
+    </details>
+    {{else}}<p class="empty">No room energy assignments exist yet. Discover and test a component above.</p>{{end}}
+  </div>
+</section>
+
+<script defer src="/static/js/room-energy.js"></script>
+{{end}}
+
+{{define "room-energy-effective-fields"}}
+<label>Effective from<select name="effective_preset" data-room-effective-preset><option value="now">Now</option><option value="today">Beginning of today</option><option value="billing_cycle">Beginning of billing cycle</option><option value="custom">Custom date and time</option></select></label>
+<label data-room-custom-effective hidden>Custom effective time<input type="datetime-local" name="effective_at"></label>
+{{end}}
+
+{{define "room-energy-discovery"}}
+{{with .RoomEnergy.Settings.Discovery}}
+  {{if .Error}}<div class="room-energy-notice is-error" role="alert">{{.Error}}</div>
+  {{else if .Components}}
+  <div class="room-energy-discovery-heading"><strong>{{.DeviceName}}</strong><span>{{len .Components}} usable components</span></div>
+  {{range .Components}}
+  <article class="room-energy-component">
+    <header><div><h4>{{.Label}}</h4><code>{{.Key}} · {{.Type}}</code></div><span class="room-energy-tag">Discovered</span></header>
+    <form class="room-energy-inline-form" method="post" action="/energy/rooms/assignments/test" hx-post="/energy/rooms/assignments/test" hx-target="next .room-energy-test-result" hx-swap="innerHTML">
+      <input type="hidden" name="_csrf" value="{{$.CSRF}}"><input type="hidden" name="device_id" value="{{$.RoomEnergy.Settings.Discovery.DeviceID}}"><input type="hidden" name="component_key" value="{{.Key}}"><button class="button secondary">Test component</button>
+    </form>
+    <div class="room-energy-test-result" aria-live="polite"></div>
+    <details class="room-energy-component-assignment"><summary>Assign to a room</summary>
+      <form class="form-grid" method="post" action="/energy/rooms/assignments">
+        <input type="hidden" name="_csrf" value="{{$.CSRF}}"><input type="hidden" name="device_id" value="{{$.RoomEnergy.Settings.Discovery.DeviceID}}"><input type="hidden" name="component_key" value="{{.Key}}">
+        <label>Room<select name="room_id" data-room-select required><option value="">Choose a room</option>{{range $.RoomEnergy.Settings.Rooms}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></label>
+        <label>Display name<input name="display_name" maxlength="100" value="{{.Label}}" required></label>
+        <label>Aggregation role<select name="aggregation_role" data-room-role required><option value="primary">Primary</option><option value="submeter">Submeter</option><option value="excluded">Excluded</option></select></label>
+        <label data-room-parent-field hidden>Parent primary meter<select name="parent_assignment_id"><option value="0">Choose a parent</option>{{range $.RoomEnergy.Settings.Assignments}}{{if eq .Role "primary"}}<option value="{{.ID}}" data-room-id="{{.RoomID}}">{{.RoomName}} · {{.DisplayName}}</option>{{end}}{{end}}</select></label>
+        <label>Poll interval (seconds)<input type="number" name="poll_interval_seconds" min="5" max="300" value="30" required></label>
+        {{template "room-energy-effective-fields" $}}
+        <label class="check"><input type="checkbox" name="enabled" checked> Enable background collection</label>
+        <label class="check room-energy-main-warning"><input type="checkbox" name="main_meter_acknowledged"> I understand this may be the whole-house meter and could invalidate room reconciliation</label>
+        <button class="button primary">Test again and save assignment</button>
+      </form>
+    </details>
+  </article>
+  {{end}}
+  {{else}}<p class="empty">No usable energy or power component was discovered on this device.</p>{{end}}
+{{end}}
+{{end}}
+
+{{define "room-energy-test-result"}}
+{{with .RoomEnergy.Settings.Test}}
+  {{if .Attempted}}
+    {{if .Available}}
+    <div class="room-energy-test is-success" role="status">
+      <div><strong>Component is available.</strong><span>{{.Label}} · <code>{{.ComponentKey}}</code></span></div>
+      <dl><div><dt>Current power</dt><dd>{{.CurrentPower}}</dd></div><div><dt>Imported energy</dt><dd>{{.ImportedEnergy}}</dd></div><div><dt>Voltage</dt><dd>{{.Voltage}}</dd></div><div><dt>Last response</dt><dd>{{.LastResponse}}</dd></div></dl>
+      {{if .PowerOnly}}<p class="room-energy-notice is-warning">This source exposes instantaneous power but no cumulative energy. Historical energy may be estimated from power samples.</p>{{end}}
+      {{if .MainMeter}}<p class="room-energy-notice is-warning">This is the whole-house meter. Assigning it to a room may make that room represent the entire property and can invalidate room reconciliation.</p>{{end}}
+    </div>
+    {{else}}<div class="room-energy-test is-error" role="alert"><strong>Component test failed.</strong><span>{{.Error}}</span></div>{{end}}
+  {{end}}
+{{end}}
+{{end}}
+
+{{define "energy-reconciliation"}}
+{{template "energy-subnav" .}}
+{{template "room-energy-feedback" .}}
+
+<section class="room-energy-heading">
+  <div><p class="eyebrow">ACCOUNTING CHECK</p><h2>Room-meter reconciliation</h2><p>Compare de-duplicated room meters with the whole-house source of truth without silently correcting measurements.</p></div>
+  <div class="room-energy-heading-actions"><a class="button secondary" href="/energy/rooms">Room overview</a><a class="button primary" href="/energy/rooms/settings">Adjust tolerance</a></div>
+</section>
+
+{{if not .RoomEnergy.Configured}}
+<section class="panel room-energy-onboarding">
+  <p class="eyebrow">MAIN METER REQUIRED</p><h3>Reconciliation starts with a whole-house meter</h3>
+  <p>Configure and test the main meter before comparing room totals or calculating Unmetered / Other.</p>
+  <div><a class="button primary" href="/energy/settings">Configure main meter</a><a class="button secondary" href="/energy/rooms/settings">Prepare room sources</a></div>
+</section>
+{{else}}
+
+<section class="room-energy-summary room-energy-reconciliation-summary" aria-label="Reconciliation summary">
+  <article class="panel room-energy-stat"><span>Whole-house energy</span><strong>{{.RoomEnergy.Reconciliation.WholeHouseEnergy}}</strong><small>Main meter</small></article>
+  <article class="panel room-energy-stat"><span>Room-meter energy</span><strong>{{.RoomEnergy.Reconciliation.RoomEnergy}}</strong><small>Root primary sources</small></article>
+  <article class="panel room-energy-stat"><span>Unmetered / Other</span><strong>{{.RoomEnergy.Reconciliation.UnmeteredEnergy}}</strong><small>Never negative</small></article>
+  <article class="panel room-energy-stat"><span>Coverage</span><strong>{{.RoomEnergy.Reconciliation.Coverage}}</strong><small>Room meters / whole house</small></article>
+  <article class="panel room-energy-stat"><span>Absolute difference</span><strong>{{.RoomEnergy.Reconciliation.Difference}}</strong><small>{{.RoomEnergy.Reconciliation.DifferencePercent}}</small></article>
+  <article class="panel room-energy-stat"><span>Status</span><strong class="room-energy-quality quality-{{.RoomEnergy.Reconciliation.Quality}}">{{.RoomEnergy.Reconciliation.Status}}</strong><small>{{.RoomEnergy.Reconciliation.Quality}}</small></article>
+  <article class="panel room-energy-stat"><span>Relative tolerance</span><strong>{{.RoomEnergy.Reconciliation.RelativeTolerance}}</strong><small>Accepted when either tolerance applies</small></article>
+  <article class="panel room-energy-stat"><span>Absolute tolerance</span><strong>{{.RoomEnergy.Reconciliation.AbsoluteTolerance}}</strong><small>Per chart interval</small></article>
+</section>
+
+{{if .RoomEnergy.Reconciliation.SuspectedDoubleCounting}}<div class="room-energy-notice is-warning" role="alert">Room meters report more energy than the whole-house meter. Check overlapping primary sources and total-versus-phase assignments. Cost allocation is normalized; unmetered energy remains zero.</div>{{end}}
+
+<section class="room-energy-reconciliation-grid">
+  <article class="panel room-energy-chart-panel">
+    <div class="panel-head"><div><p class="eyebrow">HISTORY</p><h3>Main meter, rooms, and unmetered energy</h3></div></div>
+    {{template "room-energy-range-controls" .}}
+    <p class="room-energy-chart-status" data-room-chart-status role="status">Loading reconciliation history…</p>
+    <div class="room-energy-chart-wrap"><canvas id="room-energy-reconciliation-chart" data-room-energy-chart data-chart-kind="reconciliation" data-endpoint="/energy/rooms/reconciliation/data" aria-label="Historical room-meter reconciliation chart" role="img"></canvas></div>
+    <p class="room-energy-footnote">Missing main-meter or room-source data is shown as a gap. A missing reading is not zero consumption.</p>
+  </article>
+
+  <aside class="room-energy-diagnostics">
+    <article class="panel">
+      <div class="panel-head"><div><p class="eyebrow">DATA COMPLETENESS</p><h3>Items to review</h3></div></div>
+      <dl class="room-energy-diagnostic-count"><div><dt>Intervals with warnings</dt><dd>{{.RoomEnergy.Reconciliation.WarningIntervals}}</dd></div><div><dt>Overall quality</dt><dd>{{.RoomEnergy.Reconciliation.Quality}}</dd></div></dl>
+      {{if .RoomEnergy.Reconciliation.MissingSources}}<h4>Missing sources</h4><ul>{{range .RoomEnergy.Reconciliation.MissingSources}}<li>{{.}}</li>{{end}}</ul>{{else}}<p class="room-energy-good">No missing sources were identified for this summary.</p>{{end}}
+    </article>
+    <article class="panel">
+      <div class="panel-head"><div><p class="eyebrow">DIAGNOSTICS</p><h3>Mismatch checklist</h3></div></div>
+      <ul class="room-energy-checklist">
+        <li>Check whether a circuit meter and its appliance meters are all configured as primary.</li>
+        <li>Check whether a three-phase total and its individual phases are both included.</li>
+        <li>Check device clocks and the application timezone.</li>
+        <li>Check whether the main meter or a room source was unavailable.</li>
+        <li>Check whether a source counter reset occurred.</li>
+        <li>Check whether a room meter measures exported rather than imported energy.</li>
+      </ul>
+      <p class="room-energy-footnote">The application never changes assignment roles automatically from a suspected mismatch.</p>
+    </article>
+  </aside>
+</section>
+
+<script defer src="/static/js/chart.umd.js"></script>
+<script defer src="/static/js/room-energy.js"></script>
+{{end}}
+{{end}}
+
+{{define "device-energy"}}
+{{with .RoomEnergy}}{{with .Device}}{{if .Supported}}
+<article class="panel span-3 room-energy-device-integration">
+  <div class="panel-head"><div><p class="eyebrow">ENERGY</p><h3>Room-energy assignments</h3></div><div><a href="/energy/rooms">Room dashboards</a> · <a href="/energy/rooms/settings">Configure</a></div></div>
+  <p>Inventory room: <strong>{{.InventoryRoomName}}</strong>. Energy attribution is separate and never changes silently when the inventory room changes.</p>
+  <div class="room-energy-device-assignments">
+    {{range .Assignments}}
+    <article>
+      <header><div><strong>{{.DisplayName}}</strong><small>{{.RoomName}} · {{.Role}}{{if .ParentName}} · parent: {{.ParentName}}{{end}}</small></div><a href="/energy/rooms/{{.RoomID}}">Open room</a></header>
+      <dl><div><dt>Current power</dt><dd>{{.CurrentPower}}</dd></div><div><dt>Today</dt><dd>{{.TodayEnergy}}</dd></div><div><dt>Billing cycle</dt><dd>{{.BillingEnergy}}</dd></div></dl>
+      {{if .CanUseInventoryRoom}}
+      <div class="room-energy-notice is-warning">Energy room <strong>{{.RoomName}}</strong> differs from inventory room <strong>{{$.RoomEnergy.Device.InventoryRoomName}}</strong>.</div>
+      <form class="form-grid" method="post" action="/devices/{{$.Device.ID}}/energy/use-inventory-room">
+        <input type="hidden" name="_csrf" value="{{$.CSRF}}"><input type="hidden" name="assignment_id" value="{{.ID}}">
+        {{template "room-energy-effective-fields" $}}
+        <button class="button secondary">Use device room for future energy readings</button>
+      </form>
+      {{end}}
+    </article>
+    {{else}}<p class="empty">No component on this device is assigned to room energy yet.</p>{{end}}
+  </div>
+  <p class="room-energy-footnote">Available components are discovered and tested on demand in <a href="/energy/rooms/settings">Room metering</a>; the browser never contacts the Shelly directly.</p>
+</article>
+<script defer src="/static/js/room-energy.js"></script>
+{{end}}{{end}}{{end}}
+{{end}}

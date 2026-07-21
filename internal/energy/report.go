@@ -21,13 +21,39 @@ type ChartPoint struct {
 	SampleCount int       `json:"sample_count"`
 }
 
-type Report struct {
+// PricedInterval retains the exact whole-house energy and price result for an
+// interval. Presentation values in ChartPoint are rounded strings; downstream
+// allocation must use these exact values so currency reconciliation cannot
+// lose or duplicate a cent.
+type PricedInterval struct {
 	Start       time.Time
 	End         time.Time
-	Interval    string
-	Points      []ChartPoint
-	Consumption decimal.Decimal
+	EnergyKWh   decimal.Decimal
 	Cost        pricing.EnergyCostBreakdown
+	Segments    []PricedSegment
+	Quality     string
+	SampleCount int
+}
+
+// PricedSegment is the contract-level price/VAT result for one effective
+// pricing slice inside an output interval. Room allocation consumes these
+// slices so a mid-hour/day price change is not blended across a changing room
+// load mix.
+type PricedSegment struct {
+	Start     time.Time
+	End       time.Time
+	EnergyKWh decimal.Decimal
+	Cost      pricing.EnergyCostBreakdown
+}
+
+type Report struct {
+	Start           time.Time
+	End             time.Time
+	Interval        string
+	Points          []ChartPoint
+	PricedIntervals []PricedInterval
+	Consumption     decimal.Decimal
+	Cost            pricing.EnergyCostBreakdown
 }
 
 func BuildReport(ctx context.Context, store *database.Store, config database.EnergyConfig, start, end time.Time, intervalType string) (Report, error) {
@@ -51,7 +77,7 @@ func BuildReport(ctx context.Context, store *database.Store, config database.Ene
 	if err != nil {
 		return Report{}, err
 	}
-	report := Report{Start: start, End: end, Interval: intervalType, Points: make([]ChartPoint, 0, len(aggregates))}
+	report := Report{Start: start, End: end, Interval: intervalType, Points: make([]ChartPoint, 0, len(aggregates)), PricedIntervals: make([]PricedInterval, 0, len(aggregates))}
 	versions, err := store.ListPricingVersions(ctx)
 	if err != nil {
 		return Report{}, err
@@ -67,6 +93,7 @@ func BuildReport(ctx context.Context, store *database.Store, config database.Ene
 	if bucketStart.Before(start) {
 		bucketStart = bucketEnd
 	}
+	cycleStates := make(map[string]pricing.AllocationState)
 	for bucketStart.Before(end) {
 		_, bucketEnd, err = IntervalBounds(bucketStart, intervalType, location)
 		if err != nil {
@@ -86,12 +113,16 @@ func BuildReport(ctx context.Context, store *database.Store, config database.Ene
 		if err != nil {
 			return Report{}, err
 		}
-		consumedBeforeWh, err := store.SumEnergyWhByInterval(ctx, config.DeviceID, config.ComponentKey, cycle.Start, aggregate.IntervalStart, intervalType)
-		if err != nil {
-			return Report{}, err
-		}
 		intervalKWh := decimal.NewFromFloat(aggregate.EnergyConsumedWh).Div(decimal.NewFromInt(1000))
-		state := pricing.AllocationState{CycleConsumptionKWh: decimal.NewFromFloat(consumedBeforeWh).Div(decimal.NewFromInt(1000))}
+		cycleKey := cycle.Start.UTC().Format(time.RFC3339Nano)
+		state, stateFound := cycleStates[cycleKey]
+		if !stateFound {
+			consumedBeforeWh, sumErr := store.SumEnergyWhByInterval(ctx, config.DeviceID, config.ComponentKey, cycle.Start, aggregate.IntervalStart, intervalType)
+			if sumErr != nil {
+				return Report{}, sumErr
+			}
+			state = pricing.AllocationState{CycleConsumptionKWh: decimal.NewFromFloat(consumedBeforeWh).Div(decimal.NewFromInt(1000))}
+		}
 		cost := pricing.EnergyCostBreakdown{}
 		segments, err := priceSegments(aggregate.IntervalStart, aggregate.IntervalEnd, versions)
 		if err != nil {
@@ -102,6 +133,7 @@ func BuildReport(ctx context.Context, store *database.Store, config database.Ene
 			return Report{}, segmentErr
 		}
 		allocated := decimal.Zero
+		pricedSegments := make([]PricedSegment, 0, len(segments))
 		for index, segment := range segments {
 			segmentKWh := intervalKWh.Sub(allocated)
 			if hasActualSegments {
@@ -122,9 +154,12 @@ func BuildReport(ctx context.Context, store *database.Store, config database.Ene
 			}
 			allocated = allocated.Add(segmentKWh)
 			cost = addCost(cost, segmentCost)
+			pricedSegments = append(pricedSegments, PricedSegment{Start: segment.Start, End: segment.End, EnergyKWh: segmentKWh, Cost: segmentCost})
 		}
+		cycleStates[cycleKey] = state
 		report.Consumption = report.Consumption.Add(intervalKWh)
 		report.Cost = addCost(report.Cost, cost)
+		report.PricedIntervals = append(report.PricedIntervals, PricedInterval{Start: aggregate.IntervalStart, End: aggregate.IntervalEnd, EnergyKWh: intervalKWh, Cost: cost, Segments: pricedSegments, Quality: aggregate.CalculationQuality, SampleCount: aggregate.SampleCount})
 		point := ChartPoint{Start: aggregate.IntervalStart, End: aggregate.IntervalEnd, Quality: aggregate.CalculationQuality, SampleCount: aggregate.SampleCount}
 		if aggregate.SampleCount > 0 {
 			energyKWh := intervalKWh.Round(3).StringFixed(3)

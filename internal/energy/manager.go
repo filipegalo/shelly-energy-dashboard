@@ -50,14 +50,26 @@ type Manager struct {
 	newClient func() energyClient
 
 	lifecycleMu        sync.Mutex
+	stopped            bool
+	workers            map[SourceKey]*collectorWorker
+	supervisorCancel   context.CancelFunc
+	supervisorDone     chan struct{}
+	supervisorWake     chan struct{}
+	nextBoundary       time.Time
+	requestSlots       chan struct{}
+	onWorkerStart      func(SourceKey)
+	onWorkerStop       func(SourceKey)
 	housekeepingOnce   sync.Once
 	housekeepingCancel context.CancelFunc
 	housekeepingDone   chan struct{}
-	mu                 sync.Mutex
-	cancel             context.CancelFunc
-	done               chan struct{}
-	latest             LiveState
-	subscribers        map[chan LiveState]struct{}
+
+	mu              sync.Mutex
+	latest          LiveState
+	subscribers     map[chan LiveState]struct{}
+	roomSubscribers map[chan RoomLiveEvent]struct{}
+	sourceStates    map[SourceKey]SourceLiveState
+	roomVersion     uint64
+	roomUpdatedAt   time.Time
 }
 
 type energyClient interface {
@@ -67,50 +79,19 @@ type energyClient interface {
 }
 
 func NewManager(appCtx context.Context, store *database.Store, cfg config.Config, logger *slog.Logger, metricSet *metrics.Metrics, cipher *credentials.Cipher) *Manager {
-	manager := &Manager{appCtx: appCtx, store: store, cfg: cfg, logger: logger, metrics: metricSet, cipher: cipher, subscribers: map[chan LiveState]struct{}{}}
+	if appCtx == nil {
+		appCtx = context.Background()
+	}
+	if metricSet == nil {
+		metricSet = metrics.New()
+	}
+	manager := &Manager{
+		appCtx: appCtx, store: store, cfg: cfg, logger: logger, metrics: metricSet, cipher: cipher,
+		workers: make(map[SourceKey]*collectorWorker), requestSlots: make(chan struct{}, maximumCollectorConcurrency), supervisorWake: make(chan struct{}, 1),
+		subscribers: map[chan LiveState]struct{}{}, roomSubscribers: map[chan RoomLiveEvent]struct{}{}, sourceStates: map[SourceKey]SourceLiveState{},
+	}
 	manager.newClient = func() energyClient { return shelly.NewClient(cfg.DefaultConnectionTimeout, cfg.DefaultRequestTimeout) }
 	return manager
-}
-
-func (m *Manager) Start(ctx context.Context) error {
-	m.startHousekeeping()
-	return m.Reconfigure(ctx)
-}
-
-func (m *Manager) Reconfigure(ctx context.Context) error {
-	m.lifecycleMu.Lock()
-	defer m.lifecycleMu.Unlock()
-	m.stopCurrent()
-	energyConfig, err := m.store.GetEnergyConfig(ctx)
-	if err != nil {
-		return err
-	}
-	state := LiveState{Configured: energyConfig.DeviceID != 0 && energyConfig.ComponentKey != "", Enabled: energyConfig.Enabled, DeviceID: energyConfig.DeviceID, ComponentKey: energyConfig.ComponentKey, PollIntervalSeconds: energyConfig.PollIntervalSeconds}
-	m.publish(state)
-	if !energyConfig.Enabled {
-		return nil
-	}
-	if err := validateCollectorConfig(energyConfig); err != nil {
-		return err
-	}
-	collectorCtx, cancel := context.WithCancel(m.appCtx)
-	done := make(chan struct{})
-	m.mu.Lock()
-	m.cancel, m.done = cancel, done
-	m.mu.Unlock()
-	go m.run(collectorCtx, done, energyConfig)
-	return nil
-}
-
-func (m *Manager) Stop() {
-	m.lifecycleMu.Lock()
-	defer m.lifecycleMu.Unlock()
-	m.stopCurrent()
-	if m.housekeepingCancel != nil {
-		m.housekeepingCancel()
-		<-m.housekeepingDone
-		m.housekeepingCancel, m.housekeepingDone = nil, nil
-	}
 }
 
 func (m *Manager) startHousekeeping() {
@@ -133,19 +114,6 @@ func (m *Manager) startHousekeeping() {
 			}
 		}()
 	})
-}
-
-func (m *Manager) stopCurrent() {
-	m.mu.Lock()
-	cancel, done := m.cancel, m.done
-	m.cancel, m.done = nil, nil
-	m.mu.Unlock()
-	if cancel != nil {
-		cancel()
-	}
-	if done != nil {
-		<-done
-	}
 }
 
 func (m *Manager) DiscoverMeter(ctx context.Context, deviceID int64) (database.Device, []shelly.EnergyComponent, error) {
@@ -217,12 +185,15 @@ func (m *Manager) TestMeter(ctx context.Context, deviceID int64, componentKey st
 func (m *Manager) Subscribe() (<-chan LiveState, func(), error) {
 	channel := make(chan LiveState, 4)
 	m.mu.Lock()
+	if m.subscribers == nil {
+		m.subscribers = make(map[chan LiveState]struct{})
+	}
 	if len(m.subscribers) >= maxSubscribers {
 		m.mu.Unlock()
 		return nil, func() {}, ErrTooManySubscribers
 	}
 	m.subscribers[channel] = struct{}{}
-	latest := m.latest
+	latest := cloneLiveState(m.latest)
 	m.mu.Unlock()
 	channel <- latest
 	return channel, func() {
@@ -235,15 +206,12 @@ func (m *Manager) Subscribe() (<-chan LiveState, func(), error) {
 func (m *Manager) Latest() LiveState {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	state := m.latest
-	if state.Online && !state.Reading.Timestamp.IsZero() && time.Since(state.Reading.Timestamp) > 2*time.Duration(state.PollIntervalSeconds)*time.Second {
-		state.Stale = true
-	}
-	return state
+	return liveStateAt(m.latest, time.Now())
 }
 
-func (m *Manager) run(ctx context.Context, done chan struct{}, energyConfig database.EnergyConfig) {
+func (m *Manager) run(ctx context.Context, done chan struct{}, source collectorSource) {
 	defer close(done)
+	energyConfig := source.Config
 	defer m.recordEvent(energyConfig, "collection_stopped", nil)
 	m.recordEvent(energyConfig, "collection_started", nil)
 
@@ -264,15 +232,19 @@ func (m *Manager) run(ctx context.Context, done chan struct{}, energyConfig data
 		var reading shelly.EnergyReading
 		err := accessErr
 		if err == nil {
-			client := m.newClient()
-			var identity shelly.DeviceInfo
-			identity, err = client.Identify(ctx, address)
-			if err == nil {
-				err = validateMeterIdentity(device, identity)
-			}
-			if err == nil {
-				reading, err = client.ReadEnergy(ctx, address, energyConfig.ComponentKey, credential)
-			}
+			err = m.withCollectionSlot(ctx, func() error {
+				client := m.newClient()
+				identity, identifyErr := client.Identify(ctx, address)
+				if identifyErr != nil {
+					return identifyErr
+				}
+				if identityErr := validateMeterIdentity(device, identity); identityErr != nil {
+					return identityErr
+				}
+				var readErr error
+				reading, readErr = client.ReadEnergy(ctx, address, energyConfig.ComponentKey, credential)
+				return readErr
+			})
 		}
 		m.metrics.EnergyCollectorDuration.Observe(time.Since(started).Seconds())
 		if err == nil {
@@ -305,7 +277,7 @@ func (m *Manager) run(ctx context.Context, done chan struct{}, energyConfig data
 					m.metrics.EnergyCounterResets.Inc()
 					m.recordEvent(energyConfig, "energy_counter_reset", map[string]any{"recorded_at": reading.Timestamp})
 				}
-				if err == nil {
+				if err == nil && source.MainMeter {
 					m.metrics.EnergyConsumptionKWh.Add(delta.EnergyWh / 1000)
 				}
 			}
@@ -333,26 +305,33 @@ func (m *Manager) run(ctx context.Context, done chan struct{}, energyConfig data
 				m.recordEvent(energyConfig, "meter_offline", map[string]any{"error_type": errorType})
 				wasOffline = true
 			}
-			m.publish(LiveState{Configured: true, Enabled: true, Online: !offline, Stale: true, ConsecutiveFailures: failures, LastError: userCollectorError(err), DeviceID: energyConfig.DeviceID, ComponentKey: energyConfig.ComponentKey, PollIntervalSeconds: energyConfig.PollIntervalSeconds, Reading: m.Latest().Reading})
+			previous := m.latestForSource(source.Key)
+			m.publishSource(source, LiveState{Configured: true, Enabled: true, Online: !offline, Stale: true, ConsecutiveFailures: failures, LastError: userCollectorError(err), DeviceID: energyConfig.DeviceID, ComponentKey: energyConfig.ComponentKey, PollIntervalSeconds: energyConfig.PollIntervalSeconds, Reading: previous.Reading})
 			wait = boundedBackoff(interval, failures)
-			m.logger.Warn("energy collection failed", "device_id", energyConfig.DeviceID, "component_key", energyConfig.ComponentKey, "operation", "collect_energy", "duration", time.Since(started), "result", "failure", "error_type", errorType)
+			if m.logger != nil {
+				m.logger.Warn("energy collection failed", "device_id", energyConfig.DeviceID, "component_key", energyConfig.ComponentKey, "operation", "collect_energy", "duration", time.Since(started), "result", "failure", "error_type", errorType)
+			}
 		} else {
 			if wasOffline {
 				m.recordEvent(energyConfig, "meter_online", nil)
 			}
 			failures, wasOffline = 0, false
 			_ = m.store.MarkEnergyDeviceOnline(ctx, energyConfig.DeviceID)
-			m.metrics.EnergyLastReading.Set(float64(reading.Timestamp.Unix()))
-			if reading.PowerW != nil {
-				m.metrics.EnergyCurrentPower.Set(*reading.PowerW)
-			}
 			stale := time.Since(reading.Timestamp) > 2*interval
-			m.publish(LiveState{Configured: true, Enabled: true, Online: true, Stale: stale, DeviceID: device.ID, ComponentKey: energyConfig.ComponentKey, PollIntervalSeconds: energyConfig.PollIntervalSeconds, Reading: reading})
-			if !reading.Timestamp.Before(nextCostUpdate) {
+			m.publishSource(source, LiveState{Configured: true, Enabled: true, Online: true, Stale: stale, DeviceID: device.ID, ComponentKey: energyConfig.ComponentKey, PollIntervalSeconds: energyConfig.PollIntervalSeconds, Reading: reading})
+			if source.MainMeter {
+				m.metrics.EnergyLastReading.Set(float64(reading.Timestamp.Unix()))
+				if reading.PowerW != nil {
+					m.metrics.EnergyCurrentPower.Set(*reading.PowerW)
+				}
+			}
+			if source.MainMeter && !reading.Timestamp.Before(nextCostUpdate) {
 				m.updateCostMetric(ctx, energyConfig, reading.Timestamp)
 				nextCostUpdate = reading.Timestamp.Add(time.Minute)
 			}
-			m.logger.Debug("energy reading collected", "device_id", energyConfig.DeviceID, "component_key", energyConfig.ComponentKey, "operation", "collect_energy", "reading_timestamp", reading.Timestamp, "duration", time.Since(started), "result", "success")
+			if m.logger != nil {
+				m.logger.Debug("energy reading collected", "device_id", energyConfig.DeviceID, "component_key", energyConfig.ComponentKey, "operation", "collect_energy", "reading_timestamp", reading.Timestamp, "duration", time.Since(started), "result", "success")
+			}
 		}
 
 		timer := time.NewTimer(wait)
@@ -550,22 +529,30 @@ func (m *Manager) recordEvent(config database.EnergyConfig, eventType string, de
 
 func (m *Manager) publish(state LiveState) {
 	m.mu.Lock()
+	m.publishMainLocked(state)
+	m.mu.Unlock()
+}
+
+func (m *Manager) publishMainLocked(state LiveState) {
+	state = cloneLiveState(state)
 	m.latest = state
+	if m.subscribers == nil {
+		m.subscribers = make(map[chan LiveState]struct{})
+	}
 	for subscriber := range m.subscribers {
 		select {
-		case subscriber <- state:
+		case subscriber <- cloneLiveState(state):
 		default:
 			select {
 			case <-subscriber:
 			default:
 			}
 			select {
-			case subscriber <- state:
+			case subscriber <- cloneLiveState(state):
 			default:
 			}
 		}
 	}
-	m.mu.Unlock()
 }
 
 func validateCollectorConfig(config database.EnergyConfig) error {

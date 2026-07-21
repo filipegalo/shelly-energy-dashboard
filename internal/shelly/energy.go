@@ -193,6 +193,13 @@ func parseEnergyComponentKey(key string) (string, int, bool, error) {
 	return parts[0], id, false, nil
 }
 
+// ParseEnergyComponentKey validates a persisted component identity against the
+// same fixed allowlist used by ReadEnergy. Callers may store the returned kind,
+// but must never turn it into an arbitrary RPC method or URL.
+func ParseEnergyComponentKey(key string) (kind string, id int, total bool, err error) {
+	return parseEnergyComponentKey(key)
+}
+
 func discoverGen1Energy(status map[string]any) []EnergyComponent {
 	result := []EnergyComponent{}
 	for _, family := range []string{"meters", "emeters"} {

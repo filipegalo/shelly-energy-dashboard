@@ -26,6 +26,8 @@ type Room struct {
 	Icon         string
 	SortOrder    int
 	IsSystem     bool
+	Archived     bool
+	ArchivedAt   *time.Time
 	DeviceCount  int
 	OnlineCount  int
 	OfflineCount int

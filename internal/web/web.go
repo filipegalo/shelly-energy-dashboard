@@ -37,14 +37,15 @@ import (
 var assets embed.FS
 
 type Server struct {
-	store   *database.Store
-	manager *scans.Manager
-	cfg     config.Config
-	logger  *slog.Logger
-	cipher  *credentials.Cipher
-	views   *template.Template
-	metrics http.Handler
-	energy  *energyservice.Manager
+	store      *database.Store
+	manager    *scans.Manager
+	cfg        config.Config
+	logger     *slog.Logger
+	cipher     *credentials.Cipher
+	views      *template.Template
+	metrics    http.Handler
+	energy     *energyservice.Manager
+	roomEnergy roomEnergyService
 }
 
 type viewData struct {
@@ -63,6 +64,7 @@ type viewData struct {
 	Credentials []database.CredentialProfile
 	Query       map[string]string
 	Energy      energyView
+	RoomEnergy  *roomEnergyViewModel
 }
 
 func New(store *database.Store, manager *scans.Manager, cfg config.Config, logger *slog.Logger, cipher *credentials.Cipher, registryHandler http.Handler) (*Server, error) {
@@ -134,7 +136,7 @@ func NewWithEnergy(store *database.Store, manager *scans.Manager, energyManager 
 	if err != nil {
 		return nil, err
 	}
-	return &Server{store: store, manager: manager, energy: energyManager, cfg: cfg, logger: logger, cipher: cipher, views: views, metrics: registryHandler}, nil
+	return &Server{store: store, manager: manager, energy: energyManager, roomEnergy: energyManager, cfg: cfg, logger: logger, cipher: cipher, views: views, metrics: registryHandler}, nil
 }
 
 func (s *Server) Router() http.Handler {
@@ -154,6 +156,7 @@ func (s *Server) Router() http.Handler {
 	router.Post("/devices/{id}/room", s.assignRoom)
 	router.Post("/devices/{id}/credentials", s.assignCredentials)
 	router.Post("/devices/{id}/refresh", s.refreshDevice)
+	router.Post("/devices/{id}/energy/use-inventory-room", s.useInventoryRoomForEnergy)
 	router.Get("/rooms", s.roomsPage)
 	router.Get("/rooms/{id}", s.roomPage)
 	router.Post("/rooms", s.saveRoom)
@@ -186,6 +189,29 @@ func (s *Server) Router() http.Handler {
 	router.Post("/energy/settings/billing-cycle", s.saveEnergyBillingCycle)
 	router.Post("/energy/monitoring/enable", s.enableEnergyMonitoring)
 	router.Post("/energy/monitoring/disable", s.disableEnergyMonitoring)
+	// Room-energy static routes must precede /{roomID}; otherwise settings,
+	// chart, reconciliation, and events can be mistaken for a room identifier.
+	router.Get("/energy/rooms", s.roomEnergyOverviewPage)
+	router.Get("/energy/rooms/settings", s.roomEnergySettingsPage)
+	router.Get("/energy/rooms/reconciliation", s.roomEnergyReconciliationPage)
+	router.Get("/energy/rooms/chart", s.roomEnergyOverviewChart)
+	router.Get("/energy/rooms/reconciliation/data", s.roomEnergyReconciliationData)
+	router.Get("/energy/rooms/events", s.roomEnergyEvents)
+	router.Post("/energy/rooms/components/discover", s.discoverRoomEnergyComponents)
+	router.Post("/energy/rooms/devices/{deviceID}/components/discover", s.discoverRoomEnergyComponents)
+	router.Post("/energy/rooms/assignments/test", s.testRoomEnergyComponent)
+	router.Post("/energy/rooms/assignments", s.createRoomEnergyAssignment)
+	router.Post("/energy/rooms/reconciliation/settings", s.saveRoomEnergyReconciliationSettings)
+	router.Post("/energy/rooms/assignments/{assignmentID}/update", s.reviseRoomEnergyAssignment)
+	router.Post("/energy/rooms/assignments/{assignmentID}/move", s.moveRoomEnergyAssignment)
+	router.Post("/energy/rooms/assignments/{assignmentID}/disable", s.disableRoomEnergyAssignment)
+	router.Post("/energy/rooms/assignments/{assignmentID}/delete-future", s.deleteFutureRoomEnergyAssignment)
+	router.Post("/energy/rooms/assignments/{assignmentID}/test", s.testExistingRoomEnergyAssignment)
+	router.Post("/energy/rooms/assignments/{assignmentID}/role", s.reviseRoomEnergyAssignment)
+	router.Post("/energy/rooms/assignments/{assignmentID}/parent", s.reviseRoomEnergyAssignment)
+	router.Get("/energy/rooms/{roomID}", s.roomEnergyDetailPage)
+	router.Get("/energy/rooms/{roomID}/chart", s.roomEnergyRoomChart)
+	router.Get("/energy/rooms/{roomID}/sources", s.roomEnergyRoomSources)
 	return router
 }
 
@@ -227,7 +253,12 @@ func (s *Server) devicePage(w http.ResponseWriter, r *http.Request) {
 	}
 	rooms, _ := s.store.ListRooms(r.Context())
 	credentialsList, _ := s.store.ListCredentials(r.Context())
-	s.render(w, r, viewData{Page: "device", Title: device.DisplayName(), Device: device, Rooms: rooms, Credentials: credentialsList})
+	deviceEnergy, energyErr := s.buildDeviceEnergyView(r, device)
+	if energyErr != nil {
+		s.serverError(w, r, energyErr)
+		return
+	}
+	s.render(w, r, viewData{Page: "device", Title: device.DisplayName(), Device: device, Rooms: rooms, Credentials: credentialsList, RoomEnergy: &roomEnergyViewModel{Device: deviceEnergy}})
 }
 
 func (s *Server) renameDevice(w http.ResponseWriter, r *http.Request) {

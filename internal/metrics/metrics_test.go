@@ -22,11 +22,21 @@ func TestNewRegistersCollectors(t *testing.T) {
 	metrics.EnergyCounterResets.Inc()
 	metrics.EnergyMissingSamples.Inc()
 	metrics.EnergyEstimatedCost.Set(.1)
+	metrics.RoomEnergySourcesTotal.Set(2)
+	metrics.RoomEnergySourcesOnline.Set(1)
+	metrics.RoomEnergySourcesStale.Set(1)
+	metrics.RoomEnergyConsumptionKWh.Set(10)
+	metrics.RoomEnergyUnmeteredKWh.Set(2)
+	metrics.RoomEnergyCoverageRatio.Set(.8)
+	metrics.RoomEnergyReconciliationDifferenceKWh.Set(-2)
+	metrics.RoomEnergyReconciliationWarnings.Inc()
+	metrics.RoomEnergyAllocationErrors.Inc()
+	metrics.RoomEnergyAggregationDuration.Observe(.02)
 	values, err := metrics.Registry.Gather()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(values) != 17 {
+	if len(values) != 27 {
 		t.Fatalf("gathered %d metric families", len(values))
 	}
 }

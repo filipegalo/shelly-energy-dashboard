@@ -49,6 +49,10 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("apply database schema: %w", err)
 	}
+	if err := applySchemaMigrations(context.Background(), db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("apply database migrations: %w", err)
+	}
 	if err := os.Chmod(path, 0o600); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("secure database file: %w", err)
@@ -143,7 +147,20 @@ func scanNetwork(scanner interface{ Scan(...any) error }) (Network, error) {
 }
 
 func (s *Store) ListRooms(ctx context.Context) ([]Room, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT r.id,r.name,r.description,r.icon,r.sort_order,r.is_system,count(d.id),coalesce(sum(CASE WHEN d.online_status='online' THEN 1 ELSE 0 END),0),coalesce(sum(CASE WHEN d.online_status='offline' THEN 1 ELSE 0 END),0) FROM rooms r LEFT JOIN devices d ON d.room_id=r.id GROUP BY r.id ORDER BY r.sort_order,r.name`)
+	return s.listRooms(ctx, false)
+}
+
+func (s *Store) ListRoomsIncludingArchived(ctx context.Context) ([]Room, error) {
+	return s.listRooms(ctx, true)
+}
+
+func (s *Store) listRooms(ctx context.Context, includeArchived bool) ([]Room, error) {
+	query := `SELECT r.id,r.name,r.description,r.icon,r.sort_order,r.is_system,r.archived_at,count(d.id),coalesce(sum(CASE WHEN d.online_status='online' THEN 1 ELSE 0 END),0),coalesce(sum(CASE WHEN d.online_status='offline' THEN 1 ELSE 0 END),0) FROM rooms r LEFT JOIN devices d ON d.room_id=r.id`
+	if !includeArchived {
+		query += ` WHERE r.archived_at IS NULL`
+	}
+	query += ` GROUP BY r.id ORDER BY r.sort_order,r.name`
+	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -151,9 +168,11 @@ func (s *Store) ListRooms(ctx context.Context) ([]Room, error) {
 	var result []Room
 	for rows.Next() {
 		var room Room
-		if err := rows.Scan(&room.ID, &room.Name, &room.Description, &room.Icon, &room.SortOrder, &room.IsSystem, &room.DeviceCount, &room.OnlineCount, &room.OfflineCount); err != nil {
+		var archivedAt sql.NullString
+		if err := rows.Scan(&room.ID, &room.Name, &room.Description, &room.Icon, &room.SortOrder, &room.IsSystem, &archivedAt, &room.DeviceCount, &room.OnlineCount, &room.OfflineCount); err != nil {
 			return nil, err
 		}
+		setRoomArchiveFields(&room, archivedAt)
 		result = append(result, room)
 	}
 	return result, rows.Err()
@@ -161,9 +180,20 @@ func (s *Store) ListRooms(ctx context.Context) ([]Room, error) {
 
 func (s *Store) GetRoom(ctx context.Context, id int64) (Room, error) {
 	var room Room
-	err := s.db.QueryRowContext(ctx, `SELECT r.id,r.name,r.description,r.icon,r.sort_order,r.is_system,count(d.id),coalesce(sum(CASE WHEN d.online_status='online' THEN 1 ELSE 0 END),0),coalesce(sum(CASE WHEN d.online_status='offline' THEN 1 ELSE 0 END),0) FROM rooms r LEFT JOIN devices d ON d.room_id=r.id WHERE r.id=? GROUP BY r.id`, id).Scan(
-		&room.ID, &room.Name, &room.Description, &room.Icon, &room.SortOrder, &room.IsSystem, &room.DeviceCount, &room.OnlineCount, &room.OfflineCount)
+	var archivedAt sql.NullString
+	err := s.db.QueryRowContext(ctx, `SELECT r.id,r.name,r.description,r.icon,r.sort_order,r.is_system,r.archived_at,count(d.id),coalesce(sum(CASE WHEN d.online_status='online' THEN 1 ELSE 0 END),0),coalesce(sum(CASE WHEN d.online_status='offline' THEN 1 ELSE 0 END),0) FROM rooms r LEFT JOIN devices d ON d.room_id=r.id WHERE r.id=? GROUP BY r.id`, id).Scan(
+		&room.ID, &room.Name, &room.Description, &room.Icon, &room.SortOrder, &room.IsSystem, &archivedAt, &room.DeviceCount, &room.OnlineCount, &room.OfflineCount)
+	setRoomArchiveFields(&room, archivedAt)
 	return room, err
+}
+
+func setRoomArchiveFields(room *Room, archivedAt sql.NullString) {
+	if !archivedAt.Valid {
+		return
+	}
+	value := parseTime(archivedAt.String)
+	room.Archived = true
+	room.ArchivedAt = &value
 }
 
 func (s *Store) SaveRoom(ctx context.Context, room Room) (Room, error) {
@@ -175,7 +205,7 @@ func (s *Store) SaveRoom(ctx context.Context, room Room) (Room, error) {
 		}
 		room.ID, _ = result.LastInsertId()
 	} else {
-		_, err := s.db.ExecContext(ctx, `UPDATE rooms SET name=?,description=?,icon=?,sort_order=?,updated_at=? WHERE id=? AND is_system=0`, room.Name, room.Description, room.Icon, room.SortOrder, now, room.ID)
+		_, err := s.db.ExecContext(ctx, `UPDATE rooms SET name=?,description=?,icon=?,sort_order=?,updated_at=? WHERE id=? AND is_system=0 AND archived_at IS NULL`, room.Name, room.Description, room.Icon, room.SortOrder, now, room.ID)
 		if err != nil {
 			return Room{}, err
 		}
@@ -196,11 +226,44 @@ func (s *Store) DeleteRoom(ctx context.Context, id int64) error {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `UPDATE devices SET room_id=1,updated_at=? WHERE room_id=?`, timestamp(time.Now()), id); err != nil {
+	now := time.Now().UTC()
+	stamp := timestamp(now)
+	assignmentStamp := roomEnergyTimestamp(now)
+	if _, err := tx.ExecContext(ctx, `UPDATE devices SET room_id=1,updated_at=? WHERE room_id=?`, stamp, id); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM rooms WHERE id=?`, id); err != nil {
+	var assignmentCount int
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM room_energy_assignments WHERE room_id=?`, id).Scan(&assignmentCount); err != nil {
 		return err
+	}
+	if assignmentCount > 0 {
+		// A never-effective future assignment is configuration, not history.
+		// Submeters are removed first because historical parent links use a
+		// restrictive foreign key deliberately.
+		if _, err := tx.ExecContext(ctx, `DELETE FROM room_energy_assignments WHERE room_id=? AND effective_from>=? AND parent_assignment_id IS NOT NULL`, id, assignmentStamp); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM room_energy_assignments WHERE room_id=? AND effective_from>=?`, id, assignmentStamp); err != nil {
+			return err
+		}
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM room_energy_assignments WHERE room_id=?`, id).Scan(&assignmentCount); err != nil {
+			return err
+		}
+	}
+	if assignmentCount == 0 {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM rooms WHERE id=?`, id); err != nil {
+			return err
+		}
+	} else {
+		if _, err := tx.ExecContext(ctx, `UPDATE room_energy_assignments SET effective_to=?,updated_at=? WHERE room_id=? AND parent_assignment_id IS NOT NULL AND effective_from<? AND (effective_to IS NULL OR effective_to>?)`, assignmentStamp, assignmentStamp, id, assignmentStamp, assignmentStamp); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE room_energy_assignments SET effective_to=?,updated_at=? WHERE room_id=? AND parent_assignment_id IS NULL AND effective_from<? AND (effective_to IS NULL OR effective_to>?)`, assignmentStamp, assignmentStamp, id, assignmentStamp, assignmentStamp); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE rooms SET archived_at=?,updated_at=? WHERE id=? AND archived_at IS NULL`, stamp, stamp, id); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
 }
@@ -562,7 +625,7 @@ func (s *Store) DashboardStats(ctx context.Context) (DashboardStats, error) {
 	if err != nil {
 		return stats, err
 	}
-	if err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM rooms`).Scan(&stats.TotalRooms); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM rooms WHERE archived_at IS NULL`).Scan(&stats.TotalRooms); err != nil {
 		return stats, err
 	}
 	if err := s.db.QueryRowContext(ctx, `SELECT count(*) FROM networks WHERE deleted_at IS NULL`).Scan(&stats.TotalNetworks); err != nil {

@@ -57,6 +57,62 @@ services:
     build: { context: ., dockerfile: Dockerfile.mock }
     environment: { MOCK_PROFILE: energy-flaky }
     networks: { shelly-mocks: { ipv4_address: 172.28.0.15 } }
+  mock-room-main3em:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: room-main3em }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.16 } }
+  mock-room-pro4pm:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: room-pro4pm }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.17 } }
+  mock-room-em2:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: room-em2 }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.18 } }
+  mock-room-dishwasher:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: room-plug-dishwasher }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.19 } }
+  mock-room-refrigerator:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: room-plug-refrigerator }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.20 } }
+  mock-room-living-plug:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: room-plug-living }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.21 } }
+  mock-room-office-plug:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: room-plug-office }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.22 } }
+  mock-room-garage-plug:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: room-plug-garage }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.23 } }
+  mock-room-offline:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: room-source-offline }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.24 } }
+  mock-room-stale:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: room-source-stale }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.25 } }
+  mock-room-reset:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: room-source-reset }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.26 } }
+  mock-reconcile-below:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: reconcile-below }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.27 } }
+  mock-reconcile-slight-over:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: reconcile-slight-over }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.28 } }
+  mock-reconcile-significant-over:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: reconcile-significant-over }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.29 } }
 networks:
   shelly-mocks:
     ipam:

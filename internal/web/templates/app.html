@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/static/css/tailwind.css">
   <link rel="stylesheet" href="/static/css/app.css">
   <link rel="stylesheet" href="/static/css/energy.css">
+  <link rel="stylesheet" href="/static/css/room-energy.css">
   <script defer src="/static/js/htmx.min.js"></script>
   <script defer src="/static/js/app.js"></script>
 </head>
@@ -20,7 +21,7 @@
       <a href="/devices" class="{{if or (eq .Page "devices") (eq .Page "device")}}active{{end}}">Devices</a>
       <a href="/rooms" class="{{if or (eq .Page "rooms") (eq .Page "room")}}active{{end}}">Rooms</a>
       <a href="/networks" class="{{if eq .Page "networks"}}active{{end}}">Networks</a>
-      <a href="/energy" class="{{if or (eq .Page "energy") (eq .Page "energy-settings")}}active{{end}}">Energy</a>
+      <a href="/energy" class="{{if or (eq .Page "energy") (eq .Page "energy-settings") (eq .Page "energy-rooms") (eq .Page "energy-room") (eq .Page "energy-room-settings") (eq .Page "energy-reconciliation")}}active{{end}}">Energy</a>
       <a href="/scans" class="{{if or (eq .Page "scans") (eq .Page "scan")}}active{{end}}">Scan history</a>
       <a href="/settings" class="{{if eq .Page "settings"}}active{{end}}">Settings</a>
     </nav>
@@ -28,14 +29,19 @@
   </aside>
   <main>
     <header class="topbar"><div><p class="eyebrow">SHELLY INVENTORY</p><h1>{{.Title}}</h1></div></header>
+    {{if or (eq .Page "energy") (eq .Page "energy-settings")}}{{template "energy-subnav" .}}{{end}}
     {{if eq .Page "dashboard"}}{{template "dashboard" .}}{{end}}
     {{if eq .Page "devices"}}{{template "devices" .}}{{end}}
-    {{if eq .Page "device"}}{{template "device" .}}{{end}}
+    {{if eq .Page "device"}}{{template "device" .}}<section class="detail-grid">{{template "device-energy" .}}</section>{{end}}
     {{if eq .Page "rooms"}}{{template "rooms" .}}{{end}}
     {{if eq .Page "room"}}{{template "room" .}}{{end}}
     {{if eq .Page "networks"}}{{template "networks" .}}{{end}}
     {{if eq .Page "energy"}}{{template "energy" .}}{{end}}
     {{if eq .Page "energy-settings"}}{{template "energy-settings" .}}{{end}}
+    {{if eq .Page "energy-rooms"}}{{template "energy-rooms" .}}{{end}}
+    {{if eq .Page "energy-room"}}{{template "energy-room" .}}{{end}}
+    {{if eq .Page "energy-room-settings"}}{{template "energy-room-settings" .}}{{end}}
+    {{if eq .Page "energy-reconciliation"}}{{template "energy-reconciliation" .}}{{end}}
     {{if eq .Page "scans"}}{{template "scans" .}}{{end}}
     {{if eq .Page "scan"}}{{template "scan" .}}{{end}}
     {{if eq .Page "settings"}}{{template "settings" .}}{{end}}

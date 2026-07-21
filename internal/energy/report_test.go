@@ -190,6 +190,45 @@ func TestBuildReportSplitsOneAggregateAtAPricingChange(t *testing.T) {
 	}
 }
 
+func TestBuildReportRetainsExactPricedIntervalsForDownstreamAllocation(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	store, energyConfig := reportTestFixture(t)
+	start := time.Date(2026, time.July, 12, 10, 0, 0, 0, time.UTC)
+
+	version := zeroTaxPricing("0.123456789", start)
+	if _, err := store.CreatePricingVersion(ctx, version); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpsertEnergyAggregate(ctx, database.EnergyAggregate{
+		IntervalType:       "hour",
+		IntervalStart:      start,
+		IntervalEnd:        start.Add(time.Hour),
+		DeviceID:           energyConfig.DeviceID,
+		ComponentKey:       energyConfig.ComponentKey,
+		EnergyConsumedWh:   1000,
+		SampleCount:        60,
+		CalculationQuality: QualityMeasured,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := BuildReport(ctx, store, energyConfig, start, start.Add(time.Hour), "hour")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.PricedIntervals) != 1 {
+		t.Fatalf("priced interval count = %d, want 1", len(report.PricedIntervals))
+	}
+	interval := report.PricedIntervals[0]
+	if !interval.EnergyKWh.Equal(decimal.NewFromInt(1)) || !interval.Cost.TotalIncludingVAT.Equal(decimal.RequireFromString("0.123456789")) {
+		t.Fatalf("exact priced interval = %+v", interval)
+	}
+	if report.Points[0].CostEUR == nil || *report.Points[0].CostEUR != "0.1235" {
+		t.Fatalf("display point should remain rounded independently: %+v", report.Points[0])
+	}
+}
+
 func TestBuildReportCarriesVATAllowanceAcrossIntervals(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

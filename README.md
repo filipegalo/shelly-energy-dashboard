@@ -1,12 +1,12 @@
-# Shelly Inventory
+# Shelly Energy Dashboard
 
-Shelly Inventory is a self-hosted, local-only inventory and whole-house energy monitor for Shelly smart-home devices. One Go process serves the responsive web interface, discovers devices on explicitly configured networks, queries their local APIs, stores normalized inventory and energy history in SQLite, schedules recurring work, and streams live state to the browser with Server-Sent Events. It has no Shelly Cloud dependency and never asks the browser to contact a device.
+Shelly Energy Dashboard is a self-hosted, local-only inventory, whole-house energy monitor, and per-room energy dashboard for Shelly smart-home devices. One Go process serves the responsive web interface, discovers devices on explicitly configured networks, queries their local APIs, stores normalized inventory and energy history in SQLite, schedules recurring work, and streams live state to the browser with Server-Sent Events. It has no Shelly Cloud dependency and never asks the browser to contact a device.
 
 > This MVP has no user accounts. Deploy it on a trusted management network or behind an authenticating TLS reverse proxy.
 
 ## Interface overview
 
-The dashboard summarizes online, offline, authentication-required, and unassigned devices. The Devices view supports search and filters; Rooms organize inventory without coupling identity to DHCP addresses; Networks defines the only CIDRs the scanner may contact; Scan history shows durable progress and errors. Energy selects one discovered Shelly meter as the whole-house source, then shows live power, durable history, billing-cycle summaries, and Portugal/EUR variable-cost estimates. Device details include normalized identity, network and firmware data, capabilities, credentials, diagnostics, and collapsible raw JSON.
+The dashboard summarizes online, offline, authentication-required, and unassigned devices. The Devices view supports search and filters; Rooms organize inventory without coupling identity to DHCP addresses; Networks defines the only CIDRs the scanner may contact; Scan history shows durable progress and errors. Energy selects one discovered Shelly meter as the whole-house source, then shows live power, durable history, billing-cycle summaries, and Portugal/EUR variable-cost estimates. Energy → Rooms attributes independently addressable meter channels to rooms, compares their consumption and allocated cost, and reconciles them against the main meter. Device details include normalized identity, network and firmware data, capabilities, credentials, diagnostics, and collapsible raw JSON.
 
 ## Architecture
 
@@ -17,7 +17,8 @@ Browser ──HTTP/HTMX/SSE──> one Go process
                               ├── bounded CIDR scanner + mDNS candidates
                               ├── Shelly Gen1 and Gen2/3 RPC client
                               ├── in-process scheduler and scan registry
-                              ├── resilient energy collector + aggregation
+                              ├── shared multi-source energy collector + aggregation
+                              ├── effective-dated room attribution + reconciliation
                               ├── decimal pricing and billing-cycle engine
                               ├── SQLite (WAL) repositories
                               └── health, readiness, Prometheus metrics
@@ -35,7 +36,7 @@ cmd/mock-shelly/        development-only mock device
 internal/config/        environment parsing and validation
 internal/credentials/   AES-256-GCM password encryption
 internal/database/      SQLite schema and repositories
-internal/energy/        delta calculation, aggregation, billing cycles, and pricing
+internal/energy/        collection, aggregation, room attribution, reconciliation, billing, pricing
 internal/devices/       stable identity and MAC normalization
 internal/networks/      CIDR policy and safe host enumeration
 internal/shelly/        HTTP client, detection, Gen1/RPC normalization, Digest auth
@@ -59,7 +60,7 @@ Open <http://localhost:8080>. Compose publishes on host loopback by default. Dat
 
 Add a network from **Networks**, for example `192.168.20.0/24`, keep **Enable scanning** selected, and choose **Scan**. The live view continues from the latest durable snapshot after a browser reconnect. Recurring scans run inside the Go process and do not require an open browser.
 
-To enable energy monitoring, scan the network first, open **Energy → Settings**, select a device that exposes power-meter capability, discover and test its meter component, then save it. Collection runs in the server process and continues with no browser open.
+To enable energy monitoring, scan the network first, open **Energy → Settings**, select a device that exposes power-meter capability, discover and test its meter component, then save it. Collection runs in the server process and continues with no browser open. After the main meter is configured, open **Energy → Room metering** to test and assign individual components or channels to rooms.
 
 Stop the deployment with:
 
@@ -133,6 +134,42 @@ Pricing uses decimal arithmetic and versioned effective timestamps. Defaults tar
 
 The history API is `GET /energy/history?range=24h|7d|30d|billing|previous_billing|month`; custom ranges accept `range=custom&start=YYYY-MM-DD&end=YYYY-MM-DD` and are capped at 366 days. Live state is available over `GET /energy/events`. The locally bundled Chart.js asset means chart rendering does not contact a CDN.
 
+## Per-room energy dashboards
+
+Room metering is configured separately from inventory room placement. An inventory room answers where the physical Shelly device is installed; an energy assignment answers which room a particular meter component measures. This distinction matters for multi-channel devices: for example, the four channels of one Shelly Pro 4PM can be assigned independently to Kitchen, Living Room, Office, and Garage even though the physical device has only one inventory location. Changing an inventory room never rewrites energy attribution.
+
+Open **Energy → Room metering**, choose a discovered device component, test its current reading, select a room and role, and save an effective time. Component keys are validated against the server's fixed Shelly component allowlist and the device is tested by the backend before a new assignment is accepted. The main whole-house source can only be reused as a room source after an explicit warning acknowledgement.
+
+Assignments are effective-dated. Moving a source closes its old half-open interval and creates a new assignment starting at the selected time. Earlier consumption remains with the old room. Presets cover now, the start of today, and the current billing cycle; a validated custom local date and time is also supported. Future assignments can be removed. Deleting a room with energy history archives it, closes its active assignments, and keeps it available in historical reports.
+
+Each assignment has one aggregation role:
+
+- **Primary** contributes power and energy to the room total. A room can have multiple primaries.
+- **Submeter** explains part of a primary source and must name a primary parent in the same room. It is displayed in the source breakdown but is never added again to the room total.
+- **Excluded** remains visible for diagnostics and does not affect room totals, comparison charts, reconciliation, or cost. It is polled only when diagnostic collection is enabled.
+
+For example, a 10 kWh Kitchen circuit primary with 3 kWh Dishwasher and 2 kWh Refrigerator submeters remains a 10 kWh room total. The dashboard reports 5 kWh as other usage on that circuit. If submeters exceed their parent, it shows an overlap warning without changing the measured room total.
+
+The shared collector polls the main meter and all active room sources without depending on an open browser. It deduplicates a component used more than once, refreshes each device by stable inventory ID so DHCP address changes are safe, respects source-specific polling intervals, bounds concurrent requests, and streams lightweight live room/source updates. Historical charts use the existing durable source samples and minute/hour/day aggregates rather than a second room-specific reading store.
+
+### Reconciliation and allocated cost
+
+The whole-house main meter remains the source of truth. For each aligned interval:
+
+```text
+room-metered energy = sum of root primary room sources
+unmetered energy    = max(whole-house energy - room-metered energy, 0)
+coverage            = room-metered energy / whole-house energy
+```
+
+**Unmetered / Other** is a calculated dashboard series, not an editable inventory room. It represents circuits without room meters, measurement gaps, standby loads, and other consumption present at the main meter. Missing source data is never converted to zero: intervals and cards are marked complete, partial, stale, missing, estimated, or reconciliation warning as appropriate.
+
+The default over-measurement tolerance is either 5% or 0.10 kWh per interval. A small mismatch keeps measured room values and proportionally normalizes allocation. A larger mismatch is preserved and highlighted for investigation; unmetered consumption never becomes negative. Tolerances and optional diagnostic collection are configured on the room-metering page.
+
+Per-room costs are allocated estimates. VAT and electricity pricing are calculated for the whole electricity contract and then distributed according to measured room energy consumption. The existing effective-dated Portugal/EUR pricing engine calculates each billing cycle once, including its single prorated reduced-VAT allowance and excise tax. That already-calculated variable cost is then allocated to rooms and Unmetered / Other by interval energy share. When room totals exceed the main meter, room shares are normalized against the measured-room total. A deterministic largest-remainder pass guarantees that final room costs plus unmetered cost equal the whole-house variable-cost estimate to the cent. Fixed invoice charges remain excluded, just as on the main Energy page.
+
+Older history remains attributable after minute data expires, but a room move or price change inside an old coarse hour/day bucket may require proportional time splitting. Such points are marked estimated because the original within-bucket load shape is no longer available.
+
 ## Discovery behavior
 
 Active discovery enumerates usable IPv4 addresses in the configured CIDR, skips traditional network/broadcast addresses, and feeds a fixed-size worker pool. It never performs an ICMP prerequisite. Each worker requests fixed local paths: `/shelly`, then Gen1 `/settings` and `/status`, or Gen2/newer RPC status/config methods. Unsupported optional RPC methods are nonfatal.
@@ -171,7 +208,7 @@ Changing or losing the key makes existing credential ciphertext undecryptable. B
 
 ## Mock devices
 
-The development mock supports Gen1, Gen2, Gen3, Digest-protected, malformed, slow, unsupported-RPC, stable-identity/IP-change, and deterministic three-phase energy profiles. Energy variants cover normal counters, a counter reset, invalid CT state, and slow responses. Launch the app and mocks on a dedicated Docker subnet:
+The development mock supports Gen1, Gen2, Gen3, Digest-protected, malformed, slow, unsupported-RPC, stable-identity/IP-change, deterministic three-phase energy, and per-room metering profiles. Energy variants cover normal counters, a counter reset, invalid CT state, slow responses, multi-channel meters, smart plugs, stale/offline sources, and reconciliation mismatches. Launch the app and mocks on a dedicated Docker subnet:
 
 ```bash
 export APP_ENCRYPTION_KEY="$(openssl rand -base64 32)"
@@ -194,13 +231,34 @@ The production scanner intentionally does not accept arbitrary ports or loopback
 
 The energy mocks use `172.28.0.11` through `172.28.0.15`. After scanning, choose the `mock-energy` device and component `em:0`. `mock-energy-reset` rolls its imported counter back after two reads, `mock-energy-invalid` reports a CT configuration error, `mock-energy-slow` exceeds normal request timeouts, and `mock-energy-flaky` transitions from online readings to a disconnected meter.
 
+The room-energy fixtures use `172.28.0.16` through `172.28.0.29`. Every successful component read advances its cumulative counter by exactly one 10-second share of its documented daily energy, so repeated test runs are deterministic.
+
+| Address | Profile | Intended use |
+|---|---|---|
+| `172.28.0.16` | `room-main3em` | Three-phase whole-house main meter at 30 kWh/day |
+| `172.28.0.17` | `room-pro4pm` | Channel 0 Kitchen 10, channel 1 Living Room 5, channel 2 Office 4, channel 3 Garage 2 kWh/day |
+| `172.28.0.18` | `room-em2` | Alternative two-channel meter: Kitchen 10 and Living Room 5 kWh/day |
+| `172.28.0.19` | `room-plug-dishwasher` | Kitchen dishwasher submeter at 3 kWh/day |
+| `172.28.0.20` | `room-plug-refrigerator` | Kitchen refrigerator submeter at 2 kWh/day |
+| `172.28.0.21`–`.23` | room smart plugs | Living Room 5, Office 4, and Garage 2 kWh/day alternatives |
+| `172.28.0.24` | `room-source-offline` | Goes offline after two successful energy reads |
+| `172.28.0.25` | `room-source-stale` | Leaves one valid reading, then stops updating while identity remains reachable |
+| `172.28.0.26` | `room-source-reset` | Resets its cumulative counter on the third energy read |
+| `172.28.0.27` | `reconcile-below` | Room channels total 21 kWh/day against the 30 kWh/day main meter |
+| `172.28.0.28` | `reconcile-slight-over` | Room channels total 30.6 kWh/day, a small over-measurement |
+| `172.28.0.29` | `reconcile-significant-over` | Room channels total 36 kWh/day, a material over-measurement |
+
+For the baseline reconciliation scenario, configure `.16` component `em:0` as the main meter and `.17` components `switch:0` through `switch:3` as the four room primary sources. Those rooms total 21 kWh/day, leaving `Unmetered / Other` at 9 kWh/day. Configure the dishwasher and refrigerator plugs as **submeters** beneath Kitchen `switch:0`; they explain 5 kWh/day of the 10 kWh/day Kitchen circuit but must not be added to the room total. The `.18` and `.21`–`.23` fixtures are alternative sources and should not simultaneously be configured as primaries over the same loads.
+
+To test over-measurement, replace the `.17` channel assignments with the corresponding channels from `.28` or `.29`; do not add both sets. The mock exposes only fixed Shelly status RPC endpoints and validates component IDs, so it cannot be used to proxy arbitrary URLs or RPC methods.
+
 ## Health and metrics
 
 - `GET /health` proves the process is serving.
 - `GET /ready` pings SQLite and returns `503` if unavailable.
 - `GET /metrics` exposes Prometheus text metrics.
 
-Metrics cover scan counts/durations by terminal status, addresses scanned, discovered/new devices, local API durations/failures, online/offline/auth-required device gauges, and running scans. Energy collectors expose request count/duration/errors, latest-reading time, live watts, process-recorded kWh, reset/missing-sample counters, and the current billing-cycle variable-cost estimate. Labels intentionally exclude device IDs, IPs, component keys, and scan IDs to control cardinality.
+Metrics cover scan counts/durations by terminal status, addresses scanned, discovered/new devices, local API durations/failures, online/offline/auth-required device gauges, and running scans. Energy collectors expose request count/duration/errors, latest-reading time, live watts, process-recorded kWh, reset/missing-sample counters, and the current billing-cycle variable-cost estimate. Room metrics cover selected, online, and stale sources plus aggregation, coverage, unmetered energy, reconciliation, and allocation health. Labels intentionally exclude room names, device IDs, IPs, component keys, and scan IDs to control cardinality.
 
 ## Backup and restore
 
@@ -253,8 +311,13 @@ Keep the encryption key with the backup procedure, but not in the same unprotect
 - **Energy page has no eligible meter:** run a fresh scan and confirm the device's local status exposes a power-meter component; then test it in **Energy → Settings**.
 - **Energy meter is stale/offline:** verify its current inventory IP, credential profile, VLAN route, and request timeout. The collector retries automatically and records the transition.
 - **Cost differs from the bill:** confirm price/VAT/excise settings, billing-cycle start day, timezone, and pricing effective timestamp. Fixed invoice charges and exported energy are intentionally excluded.
+- **A room has no data:** confirm its assignment is enabled and effective for the selected period, its component test succeeds, its role is Primary, and its latest sample is fresh. A Submeter is intentionally excluded from the room total.
+- **A room is partial or stale:** one or more expected primary sources is missing or older than twice its poll interval. Check the device IP, credentials, network route, and meter status; available source data remains visible and is not presented as complete.
+- **Room meters exceed the main meter:** open **Energy → Reconciliation** and look for a circuit meter and its appliance meters both marked Primary, a three-phase total combined with individual phases, overlapping effective dates, resets, clock differences, or an export channel selected as import. The application preserves the mismatch and normalizes cost allocation; it does not silently edit assignments.
+- **Coverage is lower than expected:** Unmetered / Other includes every load seen by the main meter but not by reporting room primaries, including genuine unmetered circuits and measurement gaps. Compare the reconciliation chart and missing-source list before adding another Primary.
+- **A moved source appears in its old room:** reports use the assignment effective at the time of consumption. Check the selected reporting range and the move's effective timestamp; earlier readings deliberately stay with the old room.
 - **Compose refuses to start:** export `APP_ENCRYPTION_KEY` before running Compose.
 
 ## Known limitations and future extensions
 
-The MVP is IPv4-only, assumes the Shelly local HTTP API is reachable on its standard port, supports one whole-house meter, runs one scheduler/collector instance, and has no application authentication or TLS termination. Compose therefore publishes to loopback by default; wider access requires an authenticating TLS reverse proxy or an explicitly trusted management network plus `APP_PUBLISHED_ADDRESS` and `APP_ALLOWED_HOSTS` configuration. mDNS is best effort. It intentionally does not control switches, lights, covers, gates, firmware, or device configuration. Per-room disaggregation, demand tariffs, fixed invoice charges, Home Assistant synchronization, alerting, multi-user access, and a public external API remain future extensions.
+The MVP is IPv4-only, assumes the Shelly local HTTP API is reachable on its standard port, supports one whole-house meter, runs one scheduler/shared collector instance, and has no application authentication or TLS termination. Compose therefore publishes to loopback by default; wider access requires an authenticating TLS reverse proxy or an explicitly trusted management network plus `APP_PUBLISHED_ADDRESS` and `APP_ALLOWED_HOSTS` configuration. mDNS is best effort. Per-room figures require user-installed meters and are measured allocation, not automatic load disaggregation. Old coarse aggregates can only approximate attribution across an expired minute-level assignment boundary. The application intentionally does not control switches, lights, covers, gates, firmware, or device configuration. Demand tariffs, fixed invoice charges, budgets, alerts, solar/battery allocation, Home Assistant synchronization, multi-user access, and a public external API remain future extensions.
