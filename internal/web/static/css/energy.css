@@ -1,0 +1,57 @@
+.energy-onboarding { max-width: 760px; padding: 48px; }
+.energy-onboarding h2 { font-size: 34px; margin: 8px 0; }
+.energy-onboarding p:not(.eyebrow) { max-width: 620px; color: var(--muted); line-height: 1.7; margin-bottom: 25px; }
+.energy-live { display: grid; grid-template-columns: minmax(250px, 1fr) 2fr auto; align-items: center; gap: 32px; background: radial-gradient(circle at 15% 20%, rgba(47, 204, 173, .12), transparent 40%), #10171c; }
+.energy-live h2 { font-size: 50px; margin: 7px 0; color: #f3f7fa; }
+.energy-live p { color: var(--muted); }
+.energy-live-facts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 0; }
+.energy-live-facts div { padding: 10px 14px; border-left: 2px solid var(--line); }
+.energy-live-facts dt, .energy-cost-list dt { color: var(--muted); font-size: 12px; }
+.energy-live-facts dd { margin: 5px 0 0; }
+.energy-stale { border-color: #75572b; }
+.energy-summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 18px 0; }
+.energy-summary-grid article { display: flex; flex-direction: column; gap: 8px; }
+.energy-summary-grid span { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+.energy-summary-grid strong { font-size: 24px; }
+.energy-summary-grid small { color: var(--muted); }
+.energy-chart-panel { margin-bottom: 18px; }
+.energy-range { display: flex; gap: 5px; background: #0c1216; padding: 4px; border: 1px solid var(--line); border-radius: 9px; }
+.energy-range button { border: 0; background: transparent; color: var(--muted); padding: 8px 11px; border-radius: 6px; cursor: pointer; }
+.energy-range button.active { background: #253139; color: #fff; }
+.energy-chart-wrap { height: 340px; }
+.energy-custom-range { display: flex; justify-content: flex-end; align-items: end; gap: 10px; margin: 0 0 15px; }
+.energy-custom-range label { color: var(--muted); font-size: 12px; }
+.energy-custom-range input { display: block; margin-top: 5px; }
+.energy-chart-status { text-align: center; color: var(--muted); padding: 45px; }
+.energy-footnote { font-size: 12px; color: var(--muted); margin: 18px 0 0; }
+.energy-details { align-items: start; }
+.energy-cost-list { margin: 0; }
+.energy-cost-list div { display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding: 11px 0; }
+.energy-cost-list dd { margin: 0; }
+.energy-cost-list .total { font-size: 18px; border-bottom: 0; padding-top: 18px; }
+.energy-cost-list .total dt, .energy-cost-list .total dd { color: #fff; font-weight: 700; }
+.notice { border: 1px solid #2e7368; background: #132c28; color: #a5eadc; padding: 13px 16px; border-radius: 10px; margin-bottom: 16px; }
+.energy-test-result { display: flex; gap: 24px; align-items: center; background: #102822; border: 1px solid #276557; border-radius: 9px; padding: 14px; margin: 18px 0; }
+.energy-test-result span { color: var(--muted); }
+.energy-settings-grid { margin-top: 18px; }
+.energy-previews { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 20px 0 10px; }
+.energy-previews span { background: #11191e; border: 1px solid var(--line); padding: 10px; border-radius: 7px; color: var(--muted); }
+.energy-previews strong { display: block; color: #fff; margin-bottom: 5px; }
+.energy-pricing-history { margin-top: 18px; }
+.energy-pricing-history summary { cursor: pointer; color: var(--muted); }
+@media (max-width: 1100px) {
+  .energy-summary-grid { grid-template-columns: repeat(2, 1fr); }
+  .energy-live { grid-template-columns: 1fr 1fr; }
+  .energy-live > .button { grid-column: span 2; justify-self: start; }
+}
+@media (max-width: 760px) {
+  .energy-live { grid-template-columns: 1fr; }
+  .energy-live h2 { font-size: 40px; }
+  .energy-live-facts { grid-template-columns: 1fr; }
+  .energy-live > .button { grid-column: auto; }
+  .energy-summary-grid { grid-template-columns: 1fr 1fr; }
+  .energy-range { overflow: auto; max-width: 100%; }
+  .energy-chart-wrap { height: 280px; }
+  .energy-previews { grid-template-columns: repeat(2, 1fr); }
+  .energy-onboarding { padding: 28px; }
+}

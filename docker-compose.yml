@@ -1,0 +1,38 @@
+services:
+  shelly-inventory:
+    build: .
+    container_name: shelly-inventory
+    restart: unless-stopped
+    ports:
+      - "${APP_PUBLISHED_ADDRESS:-127.0.0.1}:8080:8080"
+    environment:
+      APP_LISTEN_ADDRESS: 0.0.0.0:8080
+      APP_DATABASE_PATH: /data/shelly-inventory.db
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:?Set APP_ENCRYPTION_KEY to a 32-byte value or base64-encoded 32 bytes}
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-info}
+      APP_ALLOWED_HOSTS: ${APP_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      APP_SECURE_COOKIES: ${APP_SECURE_COOKIES:-false}
+      APP_ENABLE_MDNS: ${APP_ENABLE_MDNS:-false}
+      APP_ALLOW_NON_PRIVATE_NETWORKS: ${APP_ALLOW_NON_PRIVATE_NETWORKS:-false}
+      APP_MAX_SUBNET_PREFIX: ${APP_MAX_SUBNET_PREFIX:-16}
+      APP_DEFAULT_SCAN_CONCURRENCY: ${APP_DEFAULT_SCAN_CONCURRENCY:-32}
+      APP_DEFAULT_CONNECTION_TIMEOUT: ${APP_DEFAULT_CONNECTION_TIMEOUT:-750ms}
+      APP_DEFAULT_REQUEST_TIMEOUT: ${APP_DEFAULT_REQUEST_TIMEOUT:-2s}
+      APP_MAX_CONCURRENT_SCANS: ${APP_MAX_CONCURRENT_SCANS:-4}
+    volumes:
+      - shelly-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 128
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/shelly-inventory", "healthcheck"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  shelly-data:

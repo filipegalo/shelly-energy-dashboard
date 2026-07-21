@@ -1,0 +1,63 @@
+services:
+  mock-gen1:
+    build:
+      context: .
+      dockerfile: Dockerfile.mock
+    environment: { MOCK_PROFILE: gen1 }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.2 } }
+  mock-gen2:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: gen2 }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.3 } }
+  mock-gen3:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: gen3 }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.4 } }
+  mock-auth:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: auth }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.5 } }
+  mock-malformed:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: malformed }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.6 } }
+  mock-slow:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: slow }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.7 } }
+  mock-unsupported:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: unsupported }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.8 } }
+  mock-moving:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: ipchange }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.9 } }
+  mock-offline:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: offline }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.10 } }
+  mock-energy:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: energy }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.11 } }
+  mock-energy-reset:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: energy-reset }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.12 } }
+  mock-energy-invalid:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: energy-invalid }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.13 } }
+  mock-energy-slow:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: energy-slow }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.14 } }
+  mock-energy-flaky:
+    build: { context: ., dockerfile: Dockerfile.mock }
+    environment: { MOCK_PROFILE: energy-flaky }
+    networks: { shelly-mocks: { ipv4_address: 172.28.0.15 } }
+networks:
+  shelly-mocks:
+    ipam:
+      config: [{ subnet: 172.28.0.0/27 }]

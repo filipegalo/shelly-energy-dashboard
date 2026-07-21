@@ -1,0 +1,100 @@
+{{define "app.html"}}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>{{.Title}} · Shelly Inventory</title>
+  <link rel="stylesheet" href="/static/css/tailwind.css">
+  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="stylesheet" href="/static/css/energy.css">
+  <script defer src="/static/js/htmx.min.js"></script>
+  <script defer src="/static/js/app.js"></script>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="/"><span class="brand-mark">S</span><span><strong>Shelly Inventory</strong><small>Local device intelligence</small></span></a>
+    <nav>
+      <a href="/" class="{{if eq .Page "dashboard"}}active{{end}}">Dashboard</a>
+      <a href="/devices" class="{{if or (eq .Page "devices") (eq .Page "device")}}active{{end}}">Devices</a>
+      <a href="/rooms" class="{{if or (eq .Page "rooms") (eq .Page "room")}}active{{end}}">Rooms</a>
+      <a href="/networks" class="{{if eq .Page "networks"}}active{{end}}">Networks</a>
+      <a href="/energy" class="{{if or (eq .Page "energy") (eq .Page "energy-settings")}}active{{end}}">Energy</a>
+      <a href="/scans" class="{{if or (eq .Page "scans") (eq .Page "scan")}}active{{end}}">Scan history</a>
+      <a href="/settings" class="{{if eq .Page "settings"}}active{{end}}">Settings</a>
+    </nav>
+    <div class="local-only"><span></span><div><strong>Local only</strong><small>No Shelly Cloud</small></div></div>
+  </aside>
+  <main>
+    <header class="topbar"><div><p class="eyebrow">SHELLY INVENTORY</p><h1>{{.Title}}</h1></div></header>
+    {{if eq .Page "dashboard"}}{{template "dashboard" .}}{{end}}
+    {{if eq .Page "devices"}}{{template "devices" .}}{{end}}
+    {{if eq .Page "device"}}{{template "device" .}}{{end}}
+    {{if eq .Page "rooms"}}{{template "rooms" .}}{{end}}
+    {{if eq .Page "room"}}{{template "room" .}}{{end}}
+    {{if eq .Page "networks"}}{{template "networks" .}}{{end}}
+    {{if eq .Page "energy"}}{{template "energy" .}}{{end}}
+    {{if eq .Page "energy-settings"}}{{template "energy-settings" .}}{{end}}
+    {{if eq .Page "scans"}}{{template "scans" .}}{{end}}
+    {{if eq .Page "scan"}}{{template "scan" .}}{{end}}
+    {{if eq .Page "settings"}}{{template "settings" .}}{{end}}
+  </main>
+</div>
+</body></html>{{end}}
+
+{{define "dashboard"}}
+<section class="hero"><div><span class="pill">LAN INVENTORY</span><h2>Everything on your Shelly network,<br><em>clearly organized.</em></h2><p>Discover devices across routed VLANs, preserve their identity, and keep local operations local.</p></div>
+<form class="scan-card" method="post" action="/networks/{{if .Networks}}{{(index .Networks 0).ID}}{{end}}/scan">
+  <input type="hidden" name="_csrf" value="{{.CSRF}}"><label>Scan a network<select class="network-chooser" name="network_chooser">{{range .Networks}}<option value="{{.ID}}">{{.Name}} · {{.CIDR}}</option>{{else}}<option>No enabled networks</option>{{end}}</select></label>
+  <button class="button primary" {{if not .Networks}}disabled{{end}}>Scan now <span>→</span></button><small>Runs safely in the background</small>
+</form></section>
+<section class="stats-grid">
+  <article><span>Total devices</span><strong>{{.Stats.TotalDevices}}</strong><small>Inventoried locally</small></article>
+  <article><span>Online</span><strong class="green">{{.Stats.OnlineDevices}}</strong><small>Responding now</small></article>
+  <article><span>Offline</span><strong class="red">{{.Stats.OfflineDevices}}</strong><small>After failure threshold</small></article>
+  <article><span>Needs auth</span><strong class="amber">{{.Stats.AuthDevices}}</strong><small>Credential required</small></article>
+  <article><span>Unassigned</span><strong>{{.Stats.UnassignedDevices}}</strong><small>Ready to organize</small></article>
+  <article><span>Running scans</span><strong>{{.Stats.RunningScans}}</strong><small>Background activity</small></article>
+  <article><span>Rooms</span><strong>{{.Stats.TotalRooms}}</strong><small>House divisions</small></article>
+  <article><span>Networks</span><strong>{{.Stats.TotalNetworks}}</strong><small>Scan boundaries</small></article>
+</section>
+<section class="two-col"><article class="panel"><div class="panel-head"><div><p class="eyebrow">INVENTORY</p><h3>Recently seen devices</h3></div><a href="/devices">View all</a></div>{{template "device-table" .}}</article>
+<article class="panel"><div class="panel-head"><div><p class="eyebrow">ORGANIZATION</p><h3>Rooms</h3></div><a href="/rooms">Manage</a></div><div class="room-list">{{range .Rooms}}<a href="/rooms/{{.ID}}"><span class="room-icon">{{.Icon}}</span><span><strong>{{.Name}}</strong><small>{{.DeviceCount}} devices · {{.OnlineCount}} online</small></span><b>›</b></a>{{end}}</div></article></section>
+{{end}}
+
+{{define "devices"}}
+<section class="panel"><form class="filters" method="get"><input name="q" value="{{index .Query "q"}}" placeholder="Search name, IP, MAC"><input name="model" value="{{index .Query "model"}}" placeholder="Model"><select name="generation"><option value="">All generations</option>{{range $g := (slice "1" "2" "3" "4")}}<option value="{{$g}}" {{if eq (index $.Query "generation") $g}}selected{{end}}>Gen {{$g}}</option>{{end}}</select><select name="status"><option value="">All statuses</option>{{range $s := (slice "online" "offline" "unknown" "authentication_required")}}<option value="{{$s}}" {{if eq (index $.Query "status") $s}}selected{{end}}>{{$s}}</option>{{end}}</select><select name="room"><option value="">All rooms</option>{{range .Rooms}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select><select name="network"><option value="">All networks</option>{{range .Networks}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select><button class="button secondary">Filter</button></form>{{template "device-table" .}}</section>
+{{end}}
+
+{{define "device-table"}}<div class="table-wrap"><table><thead><tr><th>Status</th><th>Device</th><th>Model</th><th>Room</th><th>Address</th><th>Generation</th><th>Firmware</th><th>Last seen</th><th></th></tr></thead><tbody>{{range .Devices}}<tr><td><span class="{{statusClass .OnlineStatus}}">{{.OnlineStatus}}</span></td><td><a class="device-name" href="/devices/{{.ID}}">{{.DisplayName}}</a><small>{{.MACAddress}}</small></td><td>{{.Model}}</td><td>{{.RoomName}}</td><td><code>{{.IPAddress}}</code><small>{{.NetworkName}}</small></td><td>Gen {{.Generation}}</td><td>{{.FirmwareVersion}}</td><td>{{formatTime .LastSeenAt}}</td><td><a class="button secondary" href="/devices/{{.ID}}">Manage</a></td></tr>{{else}}<tr><td colspan="9" class="empty">No devices yet. Add a network and run a scan.</td></tr>{{end}}</tbody></table></div>{{end}}
+
+{{define "device"}}
+<section class="detail-title"><div><span class="{{statusClass .Device.OnlineStatus}}">{{.Device.OnlineStatus}}</span><h2>{{.Device.DisplayName}}</h2><p>{{.Device.Model}} · {{.Device.IPAddress}}</p></div><form method="post" action="/devices/{{.Device.ID}}/refresh"><input type="hidden" name="_csrf" value="{{.CSRF}}"><button class="button primary">Refresh device</button></form></section>
+<section class="detail-grid"><article class="panel span-2"><div class="panel-head"><h3>Overview</h3></div><dl class="facts"><div><dt>Device name</dt><dd>{{.Device.Name}}</dd></div><div><dt>Custom name</dt><dd>{{if .Device.CustomName}}{{.Device.CustomName}}{{else}}—{{end}}</dd></div><div><dt>Model</dt><dd>{{.Device.Model}}</dd></div><div><dt>Type</dt><dd>{{.Device.DeviceType}}</dd></div><div><dt>Generation</dt><dd>Gen {{.Device.Generation}}</dd></div><div><dt>Room</dt><dd>{{.Device.RoomName}}</dd></div><div><dt>First seen</dt><dd>{{formatTime .Device.FirstSeenAt}}</dd></div><div><dt>Last success</dt><dd>{{formatTimePtr .Device.LastSuccessfulScanAt}}</dd></div></dl></article>
+<article class="panel"><h3>Organize</h3><form class="stack" method="post" action="/devices/{{.Device.ID}}/rename" hx-post="/devices/{{.Device.ID}}/rename"><input type="hidden" name="_csrf" value="{{.CSRF}}"><label>Custom name<input name="custom_name" maxlength="100" value="{{.Device.CustomName}}"></label><button class="button secondary">Save name</button></form><form class="stack" method="post" action="/devices/{{.Device.ID}}/room"><input type="hidden" name="_csrf" value="{{.CSRF}}"><label>Room<select name="room_id">{{range .Rooms}}<option value="{{.ID}}" {{if eq .ID $.Device.RoomID}}selected{{end}}>{{.Name}}</option>{{end}}</select></label><button class="button secondary">Assign room</button></form></article>
+<article class="panel"><h3>Network</h3><dl class="facts one"><div><dt>IP address</dt><dd><code>{{.Device.IPAddress}}</code></dd></div><div><dt>MAC address</dt><dd><code>{{.Device.MACAddress}}</code></dd></div><div><dt>Hostname</dt><dd>{{.Device.Hostname}}</dd></div><div><dt>Network</dt><dd>{{.Device.NetworkName}}</dd></div></dl></article>
+<article class="panel"><h3>Software & hardware</h3><dl class="facts one"><div><dt>Firmware</dt><dd>{{.Device.FirmwareVersion}}</dd></div><div><dt>Firmware build</dt><dd>{{.Device.FirmwareBuild}}</dd></div><div><dt>Hardware revision</dt><dd>{{.Device.HardwareRevision}}</dd></div></dl></article>
+<article class="panel"><h3>Components & capabilities</h3><div class="capabilities">{{range .Device.Capabilities}}<span class="pill">{{.}}</span>{{else}}<p class="empty">No capabilities reported.</p>{{end}}</div></article>
+<article class="panel"><h3>Credentials</h3><form class="stack" method="post" action="/devices/{{.Device.ID}}/credentials"><input type="hidden" name="_csrf" value="{{.CSRF}}"><label>Credential profile<select name="credential_id"><option value="0">None</option>{{range .Credentials}}<option value="{{.ID}}" {{if eq .ID $.Device.CredentialProfileID}}selected{{end}}>{{.Name}} ({{.Username}})</option>{{end}}</select></label><button class="button secondary">Assign credentials</button></form></article>
+<article class="panel span-3"><h3>Diagnostics</h3><dl class="facts"><div><dt>Consecutive failures</dt><dd>{{.Device.ConsecutiveFailures}}</dd></div><div><dt>Last error</dt><dd>{{if .Device.LastError}}{{.Device.LastError}}{{else}}None{{end}}</dd></div><div><dt>Authentication</dt><dd>{{if .Device.AuthenticationRequired}}Required{{else}}Not required{{end}}</dd></div></dl><details><summary>Raw device information</summary><pre>{{prettyJSON .Device.RawDeviceInfo}}</pre></details><details><summary>Raw status information</summary><pre>{{prettyJSON .Device.RawStatus}}</pre></details></article></section>
+{{end}}
+
+{{define "rooms"}}
+<section class="rooms-grid">{{range .Rooms}}<article class="panel room-card"><div class="room-symbol">{{.Icon}}</div><h3><a href="/rooms/{{.ID}}">{{.Name}}</a></h3><p>{{.Description}}</p><div><span>{{.DeviceCount}} devices</span><span class="green">{{.OnlineCount}} online</span><span class="red">{{.OfflineCount}} offline</span></div>{{if not .IsSystem}}<details><summary>Edit room</summary><form class="stack" method="post" action="/rooms/{{.ID}}/update"><input type="hidden" name="_csrf" value="{{$.CSRF}}"><label>Name<input required name="name" value="{{.Name}}"></label><label>Description<textarea name="description">{{.Description}}</textarea></label><label>Icon<input name="icon" value="{{.Icon}}"></label><label>Sort order<input type="number" name="sort_order" value="{{.SortOrder}}"></label><button class="button secondary">Save room</button></form></details><form class="confirm-form" data-confirm="Delete this room? Devices move to Unassigned." method="post" action="/rooms/{{.ID}}/delete"><input type="hidden" name="_csrf" value="{{$.CSRF}}"><button class="link danger">Delete</button></form>{{end}}</article>{{end}}</section>
+<section class="panel narrow"><h3>Create a room</h3><form class="form-grid" method="post" action="/rooms"><input type="hidden" name="_csrf" value="{{.CSRF}}"><label>Name<input required maxlength="100" name="name"></label><label>Icon<input name="icon" value="home" maxlength="30"></label><label class="wide">Description<textarea name="description" maxlength="500"></textarea></label><label>Sort order<input type="number" name="sort_order" value="10"></label><button class="button primary">Create room</button></form></section>
+{{end}}
+
+{{define "room"}}<section class="detail-title"><div><p class="eyebrow">ROOM</p><h2>{{.Room.Name}}</h2><p>{{.Room.Description}}</p></div><a class="button secondary" href="/rooms">All rooms</a></section><section class="panel">{{template "device-table" .}}</section>{{end}}
+
+{{define "networks"}}
+<section class="panel"><div class="panel-head"><div><p class="eyebrow">SCAN BOUNDARIES</p><h3>Configured networks</h3></div></div><div class="network-list">{{range .Networks}}<article><div><span class="dot {{if .Enabled}}online{{end}}"></span><div><h3>{{.Name}}</h3><code>{{.CIDR}}</code><small>{{if .AutomaticScanEnabled}}Every {{.ScanIntervalSeconds}} seconds{{else}}Manual scans{{end}} · {{.ScanConcurrency}} workers</small><details><summary>Edit network</summary><form class="form-grid" method="post" action="/networks/{{.ID}}/update"><input type="hidden" name="_csrf" value="{{$.CSRF}}"><label>Name<input required name="name" value="{{.Name}}"></label><label>CIDR<input required name="cidr" value="{{.CIDR}}"></label><label>Concurrency<input type="number" min="1" max="256" name="scan_concurrency" value="{{.ScanConcurrency}}"></label><label>Interval<input type="number" min="10" name="scan_interval_seconds" value="{{.ScanIntervalSeconds}}"></label><label>Connect ms<input type="number" min="50" name="connection_timeout_ms" value="{{.ConnectionTimeoutMS}}"></label><label>Request ms<input type="number" min="100" name="request_timeout_ms" value="{{.RequestTimeoutMS}}"></label><label class="check"><input type="checkbox" name="enabled" {{if .Enabled}}checked{{end}}> Enabled</label><label class="check"><input type="checkbox" name="automatic_scan_enabled" {{if .AutomaticScanEnabled}}checked{{end}}> Scheduled</label><button class="button secondary">Save network</button></form></details></div></div><div class="actions"><form method="post" action="/networks/{{.ID}}/scan"><input type="hidden" name="_csrf" value="{{$.CSRF}}"><button class="button primary" {{if not .Enabled}}disabled{{end}}>Scan</button></form><form class="confirm-form" data-confirm="Delete this network? Devices are retained." method="post" action="/networks/{{.ID}}/delete"><input type="hidden" name="_csrf" value="{{$.CSRF}}"><button class="button danger">Delete</button></form></div></article>{{else}}<p class="empty">No networks configured.</p>{{end}}</div></section>
+<section class="two-col"><article class="panel"><h3>Add a network</h3><form class="form-grid" method="post" action="/networks"><input type="hidden" name="_csrf" value="{{.CSRF}}"><label>Name<input required maxlength="100" name="name" placeholder="IoT VLAN"></label><label>CIDR<input required name="cidr" placeholder="192.168.20.0/24" pattern="[0-9.]+/[0-9]+"></label><label>Concurrency<input type="number" min="1" max="256" name="scan_concurrency" value="32"></label><label>Interval (seconds)<input type="number" min="10" name="scan_interval_seconds" value="300"></label><label>Connect timeout (ms)<input type="number" min="50" name="connection_timeout_ms" value="750"></label><label>Request timeout (ms)<input type="number" min="100" name="request_timeout_ms" value="2000"></label><label class="check"><input type="checkbox" name="enabled" checked> Enable scanning</label><label class="check"><input type="checkbox" name="automatic_scan_enabled"> Recurring scans</label><button class="button primary">Add network</button></form></article>
+<article class="panel"><h3>Add one device manually</h3><p>Only a plain IP or hostname inside the selected enabled network is accepted.</p><form class="stack" method="post" action="/discovery/manual"><input type="hidden" name="_csrf" value="{{.CSRF}}"><label>Network<select name="network_id">{{range .Networks}}{{if .Enabled}}<option value="{{.ID}}">{{.Name}} · {{.CIDR}}</option>{{end}}{{end}}</select></label><label>IP address or hostname<input required name="target" placeholder="192.168.20.42"></label><button class="button secondary">Discover device</button></form></article></section>
+{{end}}
+
+{{define "scans"}}<section class="panel"><div class="table-wrap"><table><thead><tr><th>Scan</th><th>Network</th><th>Status</th><th>Progress</th><th>Devices</th><th>Errors</th><th>Started</th></tr></thead><tbody>{{range .Scans}}<tr><td><a href="/scans/{{.ID}}">#{{.ID}}</a><small>{{.TriggerType}}</small></td><td>{{.NetworkName}}</td><td><span class="{{statusClass .Status}}">{{.Status}}</span></td><td>{{.AddressesScanned}} / {{.AddressesTotal}} ({{.Percentage}}%)</td><td>{{.DevicesFound}}</td><td>{{.ErrorsCount}}</td><td>{{formatTime .CreatedAt}}</td></tr>{{else}}<tr><td colspan="7" class="empty">No scans have run.</td></tr>{{end}}</tbody></table></div></section>{{end}}
+
+{{define "scan"}}<section class="scan-progress" id="scan-progress" data-scan-id="{{.Scan.ID}}"><div class="progress-ring"><strong id="progress-percent">{{.Scan.Percentage}}%</strong></div><div><span id="progress-status" class="{{statusClass .Scan.Status}}">{{.Scan.Status}}</span><h2>{{.Scan.NetworkName}}</h2><p><span id="addresses-scanned">{{.Scan.AddressesScanned}}</span> of {{.Scan.AddressesTotal}} addresses checked</p><div class="bar"><span id="progress-bar" data-percent="{{.Scan.Percentage}}"></span></div><div class="scan-numbers"><span><strong id="devices-found">{{.Scan.DevicesFound}}</strong> devices</span><span><strong id="new-found">{{.Scan.NewDevicesFound}}</strong> new</span><span><strong id="updated-found">{{.Scan.UpdatedDevices}}</strong> updated</span><span><strong id="errors-count">{{.Scan.ErrorsCount}}</strong> errors</span></div>{{if or (eq .Scan.Status "queued") (eq .Scan.Status "running")}}<form class="cancel-scan-form" method="post" action="/scans/{{.Scan.ID}}/cancel"><input type="hidden" name="_csrf" value="{{.CSRF}}"><button class="button danger">Cancel scan</button></form>{{end}}</div></section><script src="/static/js/scan.js" defer></script>{{end}}
+
+{{define "settings"}}<section class="two-col"><article class="panel"><h3>Credential profiles</h3><p>Passwords are encrypted at rest and are never sent back to the browser.</p><div class="credential-list">{{range .Credentials}}<div><strong>{{.Name}}</strong><small>Username: {{.Username}}</small></div>{{else}}<p class="empty">No credential profiles.</p>{{end}}</div></article><article class="panel"><h3>Create credentials</h3><form class="stack" method="post" action="/settings/credentials"><input type="hidden" name="_csrf" value="{{.CSRF}}"><label>Profile name<input required maxlength="100" name="name"></label><label>Username<input required autocomplete="username" name="username" value="admin"></label><label>Password<input required autocomplete="new-password" type="password" name="password"></label><button class="button primary">Encrypt and save</button></form></article></section><section class="panel"><h3>Deployment security</h3><p>Shelly Inventory has no user accounts in this MVP. Keep it on a trusted management network or place an authenticating TLS reverse proxy in front of it. Discovery traffic always originates from this Go process.</p></section>{{end}}

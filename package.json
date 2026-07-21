@@ -1,0 +1,12 @@
+{
+  "name": "shelly-inventory-assets",
+  "private": true,
+  "scripts": {
+    "assets": "tailwindcss -c tailwind.config.js -i internal/web/static/css/input.css -o internal/web/static/css/tailwind.css --minify && node scripts/copy-htmx.mjs"
+  },
+  "devDependencies": {
+    "chart.js": "^4.5.0",
+    "htmx.org": "2.0.4",
+    "tailwindcss": "3.4.17"
+  }
+}

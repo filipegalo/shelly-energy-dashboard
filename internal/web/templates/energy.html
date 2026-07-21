@@ -1,0 +1,156 @@
+{{define "energy"}}
+{{if .Energy.Onboarding}}
+<section class="energy-onboarding panel">
+  <p class="eyebrow">WHOLE-HOUSE MONITORING</p>
+  <h2>Connect your main Shelly energy meter</h2>
+  <p>Choose a discovered Shelly meter and test its live data. History starts when you enable it; there is no backfill and no Shelly Cloud connection. The server keeps collecting when this page is closed.</p>
+  <a class="button primary" href="/energy/settings">Configure energy monitoring</a>
+</section>
+{{else}}
+<section class="energy-live panel {{if .Energy.Live.Stale}}energy-stale{{end}}">
+  <div>
+    <p class="eyebrow">LIVE WHOLE-HOUSE POWER</p>
+    <h2 id="energy-live-power">{{formatPower .Energy.Live.Reading.PowerW}}</h2>
+    <p id="energy-live-status">{{if .Energy.Live.Online}}{{relativeTime .Energy.Live.Reading.Timestamp}}{{else}}Meter offline{{end}}</p>
+  </div>
+  <dl class="energy-live-facts">
+    <div><dt>Voltage</dt><dd id="energy-live-voltage">{{formatMeasurement .Energy.Live.Reading.VoltageV "V"}}</dd></div>
+    <div><dt>Current</dt><dd id="energy-live-current">{{formatMeasurement .Energy.Live.Reading.CurrentA "A"}}</dd></div>
+    <div><dt>Power factor</dt><dd id="energy-live-pf">{{formatMeasurement .Energy.Live.Reading.PowerFactor ""}}</dd></div>
+    <div><dt>Source</dt><dd>{{.Energy.Device.DisplayName}} · {{.Energy.Config.ComponentKey}}</dd></div>
+    <div><dt>Model and address</dt><dd>{{.Energy.Device.Model}} · {{.Energy.Device.IPAddress}}</dd></div>
+    <div><dt>History recorded since</dt><dd>{{if .Energy.HistoryStart.IsZero}}Waiting for first sample{{else}}{{formatTime .Energy.HistoryStart}}{{end}}</dd></div>
+    {{if .Energy.Live.LastError}}<div><dt>Collector status</dt><dd>{{.Energy.Live.LastError}}</dd></div>{{end}}
+  </dl>
+  <a class="button secondary" href="/energy/settings">Settings</a>
+</section>
+
+{{template "energy-summary" .}}
+
+<section class="panel energy-chart-panel">
+  <div class="panel-head">
+    <div><p class="eyebrow">HISTORY</p><h3>Consumption and estimated variable cost</h3></div>
+    <div class="energy-range" role="group" aria-label="Energy chart range">
+      <button type="button" data-energy-range="24h" class="{{if eq .Energy.SelectedRange "24h"}}active{{end}}">24h</button>
+      <button type="button" data-energy-range="7d" class="{{if eq .Energy.SelectedRange "7d"}}active{{end}}">7d</button>
+      <button type="button" data-energy-range="30d" class="{{if eq .Energy.SelectedRange "30d"}}active{{end}}">30d</button>
+      <button type="button" data-energy-range="billing" class="{{if eq .Energy.SelectedRange "billing"}}active{{end}}">Billing cycle</button>
+      <button type="button" data-energy-range="previous_billing" class="{{if eq .Energy.SelectedRange "previous_billing"}}active{{end}}">Previous cycle</button>
+      <button type="button" data-energy-range="month" class="{{if eq .Energy.SelectedRange "month"}}active{{end}}">Month</button>
+    </div>
+  </div>
+  <form id="energy-custom-range" class="energy-custom-range"><label>From<input type="date" name="start" required></label><label>To<input type="date" name="end" required></label><button class="button secondary">Custom range</button></form>
+  <div id="energy-chart-status" class="energy-chart-status">Loading history…</div>
+  <div class="energy-chart-wrap"><canvas id="energy-chart" aria-label="Energy use and cost chart"></canvas></div>
+  <p class="energy-footnote">Estimated variable electricity cost includes configured VAT and excise tax. It excludes fixed invoice charges and exported energy.</p>
+</section>
+
+<section class="two-col energy-details">
+  {{template "energy-cost-breakdown" .}}
+  <article class="panel">
+    <div class="panel-head"><div><p class="eyebrow">BILLING CYCLE</p><h3>Reduced VAT allowance</h3></div></div>
+    <dl class="facts one">
+      <div><dt>Cycle</dt><dd>{{formatDate .Energy.BillingStart}} – {{formatEndDate .Energy.BillingEnd}}</dd></div>
+      <div><dt>Elapsed</dt><dd>{{.Energy.BillingElapsedDays}} of {{.Energy.BillingDays}} days</dd></div>
+      <div><dt>Used at reduced rate</dt><dd>{{.Energy.ReducedQuotaUsed}} kWh</dd></div>
+      <div><dt>Remaining allowance</dt><dd>{{.Energy.ReducedRemaining}} kWh</dd></div>
+    </dl>
+  </article>
+</section>
+<script defer src="/static/js/chart.umd.js"></script>
+<script defer src="/static/js/energy.js"></script>
+{{end}}
+{{end}}
+
+{{define "energy-summary"}}
+<section class="energy-summary-grid" id="energy-summary">
+  <article class="panel"><span>Today</span><strong>{{if .Energy.Today.HasData}}{{.Energy.Today.ConsumptionKWh}} kWh{{else}}—{{end}}</strong><small>{{if .Energy.Today.HasData}}€{{.Energy.Today.CostEUR}} estimated{{else}}Waiting for readings{{end}}</small></article>
+  <article class="panel"><span>Current billing cycle</span><strong>{{if .Energy.Billing.HasData}}{{.Energy.Billing.ConsumptionKWh}} kWh{{else}}—{{end}}</strong><small>{{if .Energy.Billing.HasData}}€{{.Energy.Billing.CostEUR}} estimated{{else}}Waiting for readings{{end}}</small></article>
+  <article class="panel"><span>This month</span><strong>{{if .Energy.Month.HasData}}{{.Energy.Month.ConsumptionKWh}} kWh{{else}}—{{end}}</strong><small>{{if .Energy.Month.HasData}}€{{.Energy.Month.CostEUR}} · {{.Energy.Month.ReducedKWh}} kWh reduced / {{.Energy.Month.StandardKWh}} kWh standard{{else}}Waiting for readings{{end}}</small></article>
+  <article class="panel"><span>Selected range</span><strong>{{if .Energy.Selected.HasData}}{{.Energy.Selected.ConsumptionKWh}} kWh{{else}}—{{end}}</strong><small>{{if .Energy.Selected.HasData}}€{{.Energy.Selected.CostEUR}} estimated{{else}}No history in this range{{end}}</small></article>
+</section>
+{{end}}
+
+{{define "energy-cost-breakdown"}}
+<article class="panel" id="energy-cost-breakdown">
+  <div class="panel-head"><div><p class="eyebrow">ESTIMATE</p><h3>Selected-range cost breakdown</h3></div></div>
+  {{if .Energy.Selected.HasData}}
+  <dl class="energy-cost-list">
+    <div><dt>Consumption at reduced VAT</dt><dd>{{.Energy.Selected.ReducedKWh}} kWh</dd></div>
+    <div><dt>Consumption at standard VAT</dt><dd>{{.Energy.Selected.StandardKWh}} kWh</dd></div>
+    <div><dt>Energy before VAT</dt><dd>€{{.Energy.Selected.EnergyNetEUR}}</dd></div>
+    <div><dt>Reduced-rate VAT</dt><dd>€{{.Energy.Selected.ReducedVATEUR}}</dd></div>
+    <div><dt>Standard-rate VAT</dt><dd>€{{.Energy.Selected.StandardVATEUR}}</dd></div>
+    <div><dt>Electricity excise tax</dt><dd>€{{.Energy.Selected.ExciseNetEUR}}</dd></div>
+    <div><dt>Excise VAT</dt><dd>€{{.Energy.Selected.ExciseVATEUR}}</dd></div>
+    <div class="total"><dt>Estimated total</dt><dd>€{{.Energy.Selected.TotalEUR}}</dd></div>
+  </dl>
+  {{else}}<p class="empty">No energy history is available for this range yet.</p>{{end}}
+</article>
+{{end}}
+
+{{define "energy-settings"}}
+{{if .Energy.Message}}<div class="notice">{{.Energy.Message}}</div>{{end}}
+<section class="panel">
+  <div class="panel-head"><div><p class="eyebrow">MAIN METER</p><h3>Select and test the whole-house source</h3></div><a href="/energy">Back to energy</a></div>
+  <form class="form-grid" method="post" action="/energy/settings/meter/test">
+    <input type="hidden" name="_csrf" value="{{.CSRF}}">
+    <label>Discovered device<select name="device_id" required><option value="">Choose a Shelly meter</option>{{range .Energy.Devices}}<option value="{{.ID}}" {{if eq .ID $.Energy.Device.ID}}selected{{end}}>{{.DisplayName}} · {{.IPAddress}}</option>{{end}}</select></label>
+    {{if .Energy.Components}}<label>Meter component<select name="component_key"><option value="">Discover automatically</option>{{range .Energy.Components}}<option value="{{.Key}}" {{if eq .Key $.Energy.SelectedComponentKey}}selected{{end}}>{{.Label}} · {{.Key}}</option>{{end}}</select></label>{{end}}
+    <button class="button secondary">Discover and test</button>
+  </form>
+  {{if .Energy.TestSuccessful}}
+  <div class="energy-test-result"><strong>Live reading: {{formatPower .Energy.TestReading.PowerW}}</strong><span>Imported total: {{formatMeasurement .Energy.TestReading.ImportedEnergyWh "Wh"}}</span></div>
+  <form class="form-grid" method="post" action="/energy/settings/meter">
+    <input type="hidden" name="_csrf" value="{{.CSRF}}"><input type="hidden" name="device_id" value="{{.Energy.Device.ID}}"><input type="hidden" name="component_key" value="{{.Energy.TestComponent.Key}}">
+    <label>Poll interval (seconds)<input type="number" min="5" max="300" name="poll_interval_seconds" value="{{.Energy.Config.PollIntervalSeconds}}" required></label>
+    <label>Maximum expected power (W)<input type="number" min="1" max="1000000" step="1" name="maximum_expected_power_w" value="{{.Energy.Config.MaximumExpectedPowerW}}" required></label>
+    <label class="check"><input type="checkbox" name="enabled" {{if or (not .Energy.Configured) .Energy.Config.Enabled}}checked{{end}}> Enable background collection</label>
+    <button class="button primary">Save tested meter</button>
+  </form>
+  {{end}}
+  {{if not .Energy.Devices}}<p class="empty">No discovered devices advertise energy-meter capability. Run a network scan first.</p>{{end}}
+</section>
+
+<section class="two-col energy-settings-grid">
+  <article class="panel">
+    <div class="panel-head"><div><p class="eyebrow">PORTUGAL · EUR</p><h3>Electricity pricing</h3></div></div>
+    <form class="form-grid" id="energy-pricing-form" method="post" action="/energy/settings/pricing">
+      <input type="hidden" name="_csrf" value="{{.CSRF}}">
+      <label>Energy price €/kWh, before VAT<input required inputmode="decimal" name="energy_price" value="{{.Energy.Pricing.EnergyPricePerKWhExcludingVAT}}"></label>
+      <label>Contracted power kVA<input required inputmode="decimal" name="contracted_power_kva" value="{{.Energy.Pricing.ContractedPowerKVA}}"></label>
+      <label>Reduced VAT %<input required inputmode="decimal" name="reduced_vat_rate" value="{{percentageDisplay .Energy.Pricing.ReducedVATRate}}"></label>
+      <label>Standard VAT %<input required inputmode="decimal" name="standard_vat_rate" value="{{percentageDisplay .Energy.Pricing.StandardVATRate}}"></label>
+      <label>30-day reduced limit kWh<input required inputmode="decimal" name="standard_limit_kwh" value="{{.Energy.Pricing.StandardReducedVATLimitKWhPer30Days}}"></label>
+      <label>Large-family limit kWh<input required inputmode="decimal" name="large_family_limit_kwh" value="{{.Energy.Pricing.LargeFamilyReducedVATLimitKWhPer30Days}}"></label>
+      <label>Excise tax €/kWh<input required inputmode="decimal" name="excise_tax" value="{{.Energy.Pricing.ElectricityExciseTaxPerKWh}}"></label>
+      <label>Excise VAT %<input required inputmode="decimal" name="excise_tax_vat_rate" value="{{percentageDisplay .Energy.Pricing.ElectricityExciseTaxVATRate}}"></label>
+      <label>Effective from<input type="datetime-local" name="effective_from"></label>
+      <label class="check"><input type="checkbox" name="reduced_vat_enabled" {{if .Energy.Pricing.ReducedVATEnabled}}checked{{end}}> Apply reduced VAT allowance</label>
+      <label class="check"><input type="checkbox" name="large_family_enabled" {{if .Energy.Pricing.LargeFamilyEnabled}}checked{{end}}> Large-family allowance</label>
+      <label class="check"><input type="checkbox" name="include_excise_tax" {{if .Energy.Pricing.IncludeExciseTax}}checked{{end}}> Include electricity excise tax</label>
+      <button class="button primary">Save new pricing version</button>
+    </form>
+    <div class="energy-previews">{{range .Energy.PricingPreviews}}<span data-preview-consumption="{{.Consumption}}"><strong>{{.Consumption}} kWh</strong>€<b>{{.Total}}</b></span>{{end}}</div>
+    <small>Current 31-day reduced-VAT allowance: <b id="energy-vat-preview">{{.Energy.VATPreview}}</b> kWh. Existing history keeps its effective pricing version.</small>
+    <details class="energy-pricing-history"><summary>Pricing history</summary><div class="table-wrap"><table><thead><tr><th>Effective</th><th>€/kWh before VAT</th><th>VAT rates</th><th>Cycle day</th></tr></thead><tbody>{{range .Energy.PricingHistory}}<tr><td>{{formatTime .PriceEffectiveFrom}}</td><td>{{.EnergyPricePerKWhExcludingVAT}}</td><td>{{percentageDisplay .ReducedVATRate}}% / {{percentageDisplay .StandardVATRate}}%</td><td>{{.BillingCycleStartDay}}</td></tr>{{end}}</tbody></table></div></details>
+  </article>
+  <article class="panel">
+    <div class="panel-head"><div><p class="eyebrow">PERIODS</p><h3>Billing cycle and timezone</h3></div></div>
+    <form class="stack" method="post" action="/energy/settings/billing-cycle">
+      <input type="hidden" name="_csrf" value="{{.CSRF}}">
+      <label>Cycle starts on day<input type="number" min="1" max="31" name="billing_cycle_start_day" value="{{.Energy.Config.BillingCycleStartDay}}" required></label>
+      <label>IANA timezone<input name="timezone" value="{{.Energy.Config.Timezone}}" required></label>
+      <label>Raw sample retention (days)<input type="number" min="1" max="365" name="sample_retention_days" value="{{.Energy.Config.SampleRetentionDays}}" required></label>
+      <label>Minute retention (days)<input type="number" min="1" max="730" name="minute_retention_days" value="{{.Energy.Config.MinuteRetentionDays}}" required></label>
+      <label>Hourly retention (days)<input type="number" min="1" max="3650" name="hourly_retention_days" value="{{.Energy.Config.HourlyRetentionDays}}" required></label>
+      <button class="button secondary">Save period settings</button>
+    </form>
+    {{if .Energy.Configured}}
+      {{if .Energy.Config.Enabled}}<form class="confirm-form" data-confirm="Pause background energy collection? Existing history is retained." method="post" action="/energy/monitoring/disable"><input type="hidden" name="_csrf" value="{{.CSRF}}"><button class="button danger">Disable monitoring</button></form>
+      {{else}}<form method="post" action="/energy/monitoring/enable"><input type="hidden" name="_csrf" value="{{.CSRF}}"><button class="button primary">Enable monitoring</button></form>{{end}}
+    {{end}}
+  </article>
+</section>
+<script defer src="/static/js/energy-settings.js"></script>
+{{end}}
