@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filipegalo/shelly-inventory/internal/shelly"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/shelly"
 )
 
 func TestEnergyDefaultsAndMigration(t *testing.T) {

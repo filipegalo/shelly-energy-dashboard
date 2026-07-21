@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/filipegalo/shelly-inventory/internal/database"
-	"github.com/filipegalo/shelly-inventory/internal/scans"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/database"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/scans"
 )
 
 type Scheduler struct {

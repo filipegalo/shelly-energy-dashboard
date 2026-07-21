@@ -1,4 +1,4 @@
-module github.com/filipegalo/shelly-inventory
+module github.com/filipegalo/shelly-energy-dashboard
 
 go 1.24.0
 

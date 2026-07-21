@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/filipegalo/shelly-inventory/internal/database"
-	energyservice "github.com/filipegalo/shelly-inventory/internal/energy"
-	"github.com/filipegalo/shelly-inventory/internal/energy/billingcycle"
-	"github.com/filipegalo/shelly-inventory/internal/energy/pricing"
-	"github.com/filipegalo/shelly-inventory/internal/shelly"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/database"
+	energyservice "github.com/filipegalo/shelly-energy-dashboard/internal/energy"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/energy/billingcycle"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/energy/pricing"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/shelly"
 	"github.com/shopspring/decimal"
 )
 

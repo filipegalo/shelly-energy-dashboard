@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/filipegalo/shelly-inventory/internal/shelly"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/shelly"
 	_ "modernc.org/sqlite"
 )
 

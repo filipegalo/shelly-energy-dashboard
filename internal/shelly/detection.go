@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/filipegalo/shelly-inventory/internal/devices"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/devices"
 )
 
 func Normalize(rawInfo, rawConfig, rawStatus json.RawMessage) (DeviceInfo, error) {

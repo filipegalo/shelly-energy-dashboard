@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filipegalo/shelly-inventory/internal/config"
-	"github.com/filipegalo/shelly-inventory/internal/credentials"
-	"github.com/filipegalo/shelly-inventory/internal/database"
-	"github.com/filipegalo/shelly-inventory/internal/metrics"
-	"github.com/filipegalo/shelly-inventory/internal/shelly"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/config"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/credentials"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/database"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/metrics"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/shelly"
 )
 
 func TestRunProbePoolVisitsEveryAddressWithinConcurrency(t *testing.T) {

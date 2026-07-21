@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filipegalo/shelly-inventory/internal/database"
-	"github.com/filipegalo/shelly-inventory/internal/shelly"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/database"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/shelly"
 	"github.com/shopspring/decimal"
 )
 

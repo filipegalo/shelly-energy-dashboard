@@ -6,9 +6,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/filipegalo/shelly-inventory/internal/database"
-	"github.com/filipegalo/shelly-inventory/internal/energy/billingcycle"
-	"github.com/filipegalo/shelly-inventory/internal/energy/pricing"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/database"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/energy/billingcycle"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/energy/pricing"
 	"github.com/shopspring/decimal"
 )
 

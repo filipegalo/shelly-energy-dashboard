@@ -13,12 +13,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/filipegalo/shelly-inventory/internal/config"
-	"github.com/filipegalo/shelly-inventory/internal/credentials"
-	"github.com/filipegalo/shelly-inventory/internal/database"
-	"github.com/filipegalo/shelly-inventory/internal/energy/billingcycle"
-	"github.com/filipegalo/shelly-inventory/internal/metrics"
-	"github.com/filipegalo/shelly-inventory/internal/shelly"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/config"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/credentials"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/database"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/energy/billingcycle"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/metrics"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/shelly"
 )
 
 type LiveState struct {

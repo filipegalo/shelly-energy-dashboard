@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/filipegalo/shelly-inventory/internal/config"
-	"github.com/filipegalo/shelly-inventory/internal/database"
-	"github.com/filipegalo/shelly-inventory/internal/metrics"
-	"github.com/filipegalo/shelly-inventory/internal/scans"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/config"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/database"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/metrics"
+	"github.com/filipegalo/shelly-energy-dashboard/internal/scans"
 )
 
 func TestRunDueStartsEnabledScheduledNetworkOnly(t *testing.T) {
