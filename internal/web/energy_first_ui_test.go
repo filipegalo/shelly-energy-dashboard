@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/filipegalo/shelly-energy-dashboard/internal/appinfo"
 	"github.com/filipegalo/shelly-energy-dashboard/internal/database"
 	"github.com/filipegalo/shelly-energy-dashboard/internal/shelly"
 )
@@ -58,8 +59,29 @@ func TestSidebarGroupsEnergyBeforeShellyManagement(t *testing.T) {
 	if !strings.Contains(body, "Local home energy") {
 		t.Error("sidebar does not use the energy-focused product subtitle")
 	}
+	if !strings.Contains(body, "Version "+appinfo.Current()) {
+		t.Error("sidebar does not show the configured application version")
+	}
 	if !strings.Contains(nav, `href="/" class="active" aria-current="page"`) {
 		t.Error("active overview link does not expose aria-current")
+	}
+}
+
+func TestSidebarShowsApplicationVersion(t *testing.T) {
+	t.Parallel()
+	server, store := testServer(t)
+	defer store.Close()
+	server.version = "v1.2.3"
+
+	response := httptest.NewRecorder()
+	server.render(response, httptest.NewRequest(http.MethodGet, "/", nil), viewData{
+		Page:       "dashboard",
+		Title:      "Energy Overview",
+		RoomEnergy: &roomEnergyViewModel{},
+	})
+
+	if body := response.Body.String(); !strings.Contains(body, `<span class="app-version">Version v1.2.3</span>`) {
+		t.Fatalf("sidebar does not show the application version: %s", body)
 	}
 }
 

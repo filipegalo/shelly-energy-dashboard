@@ -40,7 +40,10 @@
         <a href="/settings" class="{{if eq .Page "settings"}}active{{end}}" {{if eq .Page "settings"}}aria-current="page"{{end}}>Settings</a>
       </div>
     </nav>
-    <div class="local-only"><span></span><div><strong>Local only</strong><small>No Shelly Cloud</small></div></div>
+    <div class="sidebar-footer">
+      <div class="local-only"><span></span><div><strong>Local only</strong><small>No Shelly Cloud</small></div></div>
+      <span class="app-version">Version {{.Version}}</span>
+    </div>
   </aside>
   <main>
     <header class="topbar"><div><p class="eyebrow">LOCAL HOME ENERGY</p><h1>{{.Title}}</h1></div></header>

@@ -1,6 +1,9 @@
 services:
   shelly-inventory:
-    build: .
+    build:
+      context: .
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
     container_name: shelly-inventory
     restart: unless-stopped
     ports:

@@ -8,6 +8,7 @@ COPY internal/web/static ./internal/web/static
 RUN npm ci --ignore-scripts && npm run assets
 
 FROM golang:1.24-alpine AS build
+ARG APP_VERSION=dev
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -15,7 +16,7 @@ COPY . .
 COPY --from=assets /src/internal/web/static/css/tailwind.css ./internal/web/static/css/tailwind.css
 COPY --from=assets /src/internal/web/static/js/htmx.min.js ./internal/web/static/js/htmx.min.js
 COPY --from=assets /src/internal/web/static/js/chart.umd.js ./internal/web/static/js/chart.umd.js
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/shelly-inventory ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w -X github.com/filipegalo/shelly-energy-dashboard/internal/appinfo.Version=${APP_VERSION}" -o /out/shelly-inventory ./cmd/server
 
 FROM alpine:3.21
 RUN apk add --no-cache tzdata && addgroup -S shelly && adduser -S -G shelly -h /data shelly

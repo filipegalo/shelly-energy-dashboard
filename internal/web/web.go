@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/filipegalo/shelly-energy-dashboard/internal/appinfo"
 	"github.com/filipegalo/shelly-energy-dashboard/internal/config"
 	"github.com/filipegalo/shelly-energy-dashboard/internal/credentials"
 	"github.com/filipegalo/shelly-energy-dashboard/internal/database"
@@ -46,6 +47,7 @@ type Server struct {
 	metrics    http.Handler
 	energy     *energyservice.Manager
 	roomEnergy roomEnergyService
+	version    string
 }
 
 type viewData struct {
@@ -65,6 +67,7 @@ type viewData struct {
 	Query       map[string]string
 	Energy      energyView
 	RoomEnergy  *roomEnergyViewModel
+	Version     string
 }
 
 func New(store *database.Store, manager *scans.Manager, cfg config.Config, logger *slog.Logger, cipher *credentials.Cipher, registryHandler http.Handler) (*Server, error) {
@@ -136,7 +139,7 @@ func NewWithEnergy(store *database.Store, manager *scans.Manager, energyManager 
 	if err != nil {
 		return nil, err
 	}
-	server := &Server{store: store, manager: manager, energy: energyManager, cfg: cfg, logger: logger, cipher: cipher, views: views, metrics: registryHandler}
+	server := &Server{store: store, manager: manager, energy: energyManager, cfg: cfg, logger: logger, cipher: cipher, views: views, metrics: registryHandler, version: appinfo.Current()}
 	if energyManager != nil {
 		server.roomEnergy = energyManager
 	}
@@ -561,6 +564,7 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, data viewData) {
 	data.CSRF = csrfToken(r)
+	data.Version = s.version
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.views.ExecuteTemplate(w, "app.html", data); err != nil {
 		s.logger.Error("render response", "operation", "template", "error", err)
