@@ -1,9 +1,11 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"image/png"
 	"io"
 	"log/slog"
 	"net/http"
@@ -43,6 +45,52 @@ func TestHealthReadyDashboardAndSecurityHeaders(t *testing.T) {
 		if strings.Contains(response.Body.String(), ">Manage networks<") {
 			t.Fatalf("GET %s rendered the redundant global Manage networks action", path)
 		}
+	}
+}
+
+func TestDashboardAdvertisesAndServesFavicon(t *testing.T) {
+	t.Parallel()
+	router, store := testRouter(t)
+	defer store.Close()
+
+	pageResponse := httptest.NewRecorder()
+	router.ServeHTTP(pageResponse, httptest.NewRequest(http.MethodGet, "/", nil))
+	if pageResponse.Code != http.StatusOK {
+		t.Fatalf("GET / = %d: %s", pageResponse.Code, pageResponse.Body.String())
+	}
+	if !strings.Contains(pageResponse.Body.String(), `<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">`) {
+		t.Fatalf("dashboard does not advertise the SVG favicon: %s", pageResponse.Body.String())
+	}
+	if !strings.Contains(pageResponse.Body.String(), `<link rel="apple-touch-icon" href="/static/apple-touch-icon.png" sizes="180x180">`) {
+		t.Fatalf("dashboard does not advertise the Apple touch icon: %s", pageResponse.Body.String())
+	}
+
+	iconResponse := httptest.NewRecorder()
+	router.ServeHTTP(iconResponse, httptest.NewRequest(http.MethodGet, "/static/favicon.svg", nil))
+	if iconResponse.Code != http.StatusOK {
+		t.Fatalf("GET /static/favicon.svg = %d: %s", iconResponse.Code, iconResponse.Body.String())
+	}
+	if contentType := iconResponse.Header().Get("Content-Type"); !strings.Contains(contentType, "image/svg+xml") {
+		t.Fatalf("favicon Content-Type = %q, want image/svg+xml", contentType)
+	}
+	if body := iconResponse.Body.String(); !strings.Contains(body, `<svg`) || !strings.Contains(body, `#ff6037`) {
+		t.Fatalf("favicon is not the expected branded SVG: %s", body)
+	}
+
+	touchResponse := httptest.NewRecorder()
+	router.ServeHTTP(touchResponse, httptest.NewRequest(http.MethodGet, "/static/apple-touch-icon.png", nil))
+	if touchResponse.Code != http.StatusOK {
+		t.Fatalf("GET /static/apple-touch-icon.png = %d", touchResponse.Code)
+	}
+	if contentType := touchResponse.Header().Get("Content-Type"); !strings.Contains(contentType, "image/png") {
+		t.Fatalf("touch icon Content-Type = %q, want image/png", contentType)
+	}
+	config, err := png.DecodeConfig(bytes.NewReader(touchResponse.Body.Bytes()))
+	if err != nil {
+		t.Fatalf("decode Apple touch icon: %v", err)
+	}
+	if config.Width != 180 || config.Height != 180 {
+		t.Fatalf("touch icon dimensions = %dx%d, want 180x180", config.Width, config.Height)
 	}
 }
 
