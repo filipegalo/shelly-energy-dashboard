@@ -3,6 +3,7 @@ package scans
 import (
 	"context"
 	"net/netip"
+	"sync"
 	"time"
 
 	"github.com/grandcat/zeroconf"
@@ -15,16 +16,23 @@ func appendMDNSCandidates(parent context.Context, existing []netip.Addr, allowed
 	}
 	ctx, cancel := context.WithTimeout(parent, 750*time.Millisecond)
 	defer cancel()
-	entries := make(chan *zeroconf.ServiceEntry, 16)
+	browseResults := make([]<-chan *zeroconf.ServiceEntry, 0, 2)
 	for _, service := range []string{"_shelly._tcp", "_http._tcp"} {
-		_ = resolver.Browse(ctx, service, "local.", entries)
+		entries := make(chan *zeroconf.ServiceEntry, 16)
+		if err := resolver.Browse(ctx, service, "local.", entries); err == nil {
+			browseResults = append(browseResults, entries)
+		}
 	}
+	entries := mergeMDNSEntries(ctx, browseResults...)
 	discovered := []netip.Addr{}
 	for {
 		select {
 		case <-ctx.Done():
 			return prioritizeCandidates(existing, discovered, allowed)
-		case entry := <-entries:
+		case entry, ok := <-entries:
+			if !ok {
+				return prioritizeCandidates(existing, discovered, allowed)
+			}
 			if entry == nil {
 				continue
 			}
@@ -35,6 +43,48 @@ func appendMDNSCandidates(parent context.Context, existing []netip.Addr, allowed
 				}
 			}
 		}
+	}
+}
+
+func mergeMDNSEntries(ctx context.Context, sources ...<-chan *zeroconf.ServiceEntry) <-chan *zeroconf.ServiceEntry {
+	merged := make(chan *zeroconf.ServiceEntry, 16)
+	var forwarders sync.WaitGroup
+	forwarders.Add(len(sources))
+	for _, source := range sources {
+		go func() {
+			defer forwarders.Done()
+			forwardMDNSEntries(ctx, source, merged)
+		}()
+	}
+	go func() {
+		forwarders.Wait()
+		close(merged)
+	}()
+	return merged
+}
+
+func forwardMDNSEntries(ctx context.Context, source <-chan *zeroconf.ServiceEntry, merged chan<- *zeroconf.ServiceEntry) {
+	for {
+		select {
+		case <-ctx.Done():
+			drainMDNSEntries(source)
+			return
+		case entry, ok := <-source:
+			if !ok {
+				return
+			}
+			select {
+			case merged <- entry:
+			case <-ctx.Done():
+				drainMDNSEntries(source)
+				return
+			}
+		}
+	}
+}
+
+func drainMDNSEntries(source <-chan *zeroconf.ServiceEntry) {
+	for range source {
 	}
 }
 

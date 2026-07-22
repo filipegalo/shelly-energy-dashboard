@@ -70,6 +70,31 @@ docker compose down
 
 Do not add `-v` unless you intentionally want Docker to remove the persistent data volume.
 
+## Prebuilt container image
+
+Every push to `master` publishes a multi-architecture image with an SBOM to GitHub Container Registry for `linux/amd64` and `linux/arm64`. Because this repository is public, the workflow also attaches signed build provenance:
+
+```bash
+docker pull ghcr.io/filipegalo/shelly-energy-dashboard:latest
+```
+
+Run it directly with a persistent data volume and loopback-only port binding:
+
+```bash
+export APP_ENCRYPTION_KEY="$(openssl rand -base64 32)"
+docker run -d \
+  --name shelly-energy-dashboard \
+  --restart unless-stopped \
+  -p 127.0.0.1:8080:8080 \
+  -e APP_ENCRYPTION_KEY \
+  -e APP_LISTEN_ADDRESS=0.0.0.0:8080 \
+  -e APP_DATABASE_PATH=/data/shelly-inventory.db \
+  -v shelly-data:/data \
+  ghcr.io/filipegalo/shelly-energy-dashboard:latest
+```
+
+The publisher also creates commit-addressed `sha-<commit>` tags. Pushing a stable release tag such as `v1.2.3` additionally publishes `1.2.3`, `1.2`, and `1`; prerelease tags such as `v1.2.3-rc.1` do not replace `latest`. Use the published image digest when strict immutability is required. The first successful publication creates the package under the repository owner's **Packages**; choose its public or private visibility in the package settings. Pulling a private package requires `docker login ghcr.io` with a GitHub token that can read packages.
+
 ## Local development
 
 Requirements: Go 1.24+, Node.js 22+ for asset compilation, and SQLite CLI only for manual backup commands.
