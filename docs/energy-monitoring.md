@@ -19,6 +19,10 @@ Before each poll, the collector refreshes the device's current IP from stable in
 
 Cumulative imported-energy counters are preferred. When only power is available, the collector integrates consumption between samples. Long gaps are marked partial instead of inventing consumption. A counter decrease records a reset event and never produces negative energy. Export totals are retained when available but excluded from household-consumption cost.
 
+![Whole-house energy history chart with consumption and estimated cost](assets/energy-history.jpg)
+
+_History ranges combine measured energy with the configured variable-cost estimate. The chart remains local to the application._
+
 Default retention:
 
 | Data | Retention |
@@ -49,6 +53,10 @@ Estimates include imported variable energy, VAT, and optional excise tax. They e
 
 Inventory placement and energy assignment are intentionally separate:
 
+![Room energy summary showing measured, unmetered, and allocated household energy](assets/room-energy.jpg)
+
+_Room totals remain distinct from whole-house consumption, making unmetered energy and coverage explicit._
+
 - An **inventory room** says where the physical Shelly device is installed.
 - An **energy assignment** says which room a meter component measures.
 
@@ -73,6 +81,10 @@ Excluded sources are polled only when diagnostic collection is enabled.
 ## Reconciliation
 
 The whole-house meter remains the source of truth. For each aligned interval:
+
+![Room-meter reconciliation summary with whole-house energy, measured rooms, unmetered energy, and tolerances](assets/reconciliation.jpg)
+
+_Reconciliation preserves measured differences and exposes the configured tolerances instead of silently changing assignments._
 
 ```text
 room-metered energy = sum of root primary room sources

@@ -37,6 +37,10 @@ If no devices appear, confirm that the Docker host itself can reach `http://DEVI
 
 ## Tour the interface
 
+![Energy overview with live whole-house power, consumption, cost, and meter coverage](assets/dashboard-overview.jpg)
+
+_The overview brings live power, cost, coverage, and meter health together. Values shown here are example readings from a running deployment._
+
 - **Dashboard** summarizes online, offline, authentication-required, and unassigned devices.
 - **Devices** provides inventory search and filters. Device details include normalized identity, network and firmware data, capabilities, credential assignment, diagnostics, and collapsible raw JSON.
 - **Rooms** organizes physical inventory without coupling device identity to DHCP addresses.

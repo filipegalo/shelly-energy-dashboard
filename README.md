@@ -24,6 +24,10 @@ No Shelly Cloud. No browser-to-device requests. No external CDN dependencies.
 > [!IMPORTANT]
 > The application currently has no user accounts. Keep it on a trusted management network or place it behind an authenticating TLS reverse proxy.
 
+<p align="center">
+  <img src="docs/assets/dashboard-overview.jpg" alt="Shelly Energy Dashboard overview showing live whole-house power, daily consumption, estimated cost, meter coverage, and energy history" width="1200">
+</p>
+
 ## What it does
 
 | | Capability | Highlights |
