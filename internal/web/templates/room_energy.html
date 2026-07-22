@@ -51,45 +51,7 @@
   <article class="panel room-energy-stat"><span>Unmetered allocation</span><strong>{{.RoomEnergy.Overview.UnmeteredCost}}</strong><small>Allocated variable energy cost</small></article>
 </section>
 
-<section class="room-energy-card-grid" aria-label="Metered rooms">
-  {{range .RoomEnergy.Rooms}}
-  <article class="panel room-energy-card quality-border-{{.Quality}}" data-room-card data-room-id="{{.ID}}">
-    <header>
-      <div class="room-energy-card-title"><span class="room-energy-icon" aria-hidden="true">{{.Icon}}</span><div><h3><a href="/energy/rooms/{{.ID}}">{{.Name}}</a></h3>{{if .Archived}}<span class="room-energy-tag">Archived</span>{{end}}</div></div>
-      <span class="room-energy-quality quality-{{.Quality}}" data-room-quality>{{.Quality}}</span>
-    </header>
-    <dl class="room-energy-card-facts">
-      <div><dt>Current power</dt><dd data-room-current-power>{{.CurrentPower}}</dd></div>
-      <div><dt>Today</dt><dd>{{.TodayEnergy}}</dd></div>
-      <div><dt>Allocated cost today</dt><dd>{{.TodayCost}}</dd></div>
-      <div><dt>Billing cycle</dt><dd>{{.BillingEnergy}}</dd></div>
-      <div><dt>Allocated billing-cycle cost</dt><dd>{{.BillingCost}}</dd></div>
-      <div><dt>House share</dt><dd>{{.HouseShare}}</dd></div>
-    </dl>
-    <footer><span data-room-sources>{{.ReportingSources}} of {{.ExpectedSources}} sources reporting</span><time data-room-last-update>{{.LastUpdate}}</time></footer>
-  </article>
-  {{else}}
-  <article class="panel room-energy-empty"><h3>No room meters configured</h3><p>Assign a tested Shelly component to a room to begin collecting room history.</p><a class="button primary" href="/energy/rooms/settings">Configure room metering</a></article>
-  {{end}}
-
-  {{with .RoomEnergy.Unmetered}}
-  <article class="panel room-energy-card room-energy-unmetered quality-border-{{.Quality}}" data-room-card data-room-virtual="true">
-    <header>
-      <div class="room-energy-card-title"><span class="room-energy-icon" aria-hidden="true">∑</span><div><h3>Unmetered / Other</h3><span class="room-energy-tag">Calculated bucket</span></div></div>
-      <span class="room-energy-quality quality-{{.Quality}}">{{.Quality}}</span>
-    </header>
-    <dl class="room-energy-card-facts">
-      <div><dt>Current power</dt><dd>{{.CurrentPower}}</dd></div>
-      <div><dt>Today</dt><dd>{{.TodayEnergy}}</dd></div>
-      <div><dt>Allocated cost today</dt><dd>{{.TodayCost}}</dd></div>
-      <div><dt>Billing cycle</dt><dd>{{.BillingEnergy}}</dd></div>
-      <div><dt>Allocated billing-cycle cost</dt><dd>{{.BillingCost}}</dd></div>
-      <div><dt>Not covered</dt><dd>{{.HouseShare}}</dd></div>
-    </dl>
-    <footer><span>Difference from the main meter</span><time>{{.LastUpdate}}</time></footer>
-  </article>
-  {{end}}
-</section>
+{{template "room-energy-cards" .}}
 
 <section class="room-energy-overview-grid">
   <article class="panel room-energy-chart-panel">
@@ -142,6 +104,48 @@
 <script defer src="/static/js/chart.umd.js"></script>
 <script defer src="/static/js/room-energy.js"></script>
 {{end}}
+{{end}}
+
+{{define "room-energy-cards"}}
+<section class="room-energy-card-grid" aria-label="Metered rooms">
+  {{range .RoomEnergy.Rooms}}
+  <article class="panel room-energy-card quality-border-{{.Quality}}" data-room-card data-room-id="{{.ID}}">
+    <header>
+      <div class="room-energy-card-title"><span class="room-energy-icon" aria-hidden="true">{{.Icon}}</span><div><h3><a href="/energy/rooms/{{.ID}}">{{.Name}}</a></h3>{{if .Archived}}<span class="room-energy-tag">Archived</span>{{end}}</div></div>
+      <span class="room-energy-quality quality-{{.Quality}}" data-room-quality>{{.Quality}}</span>
+    </header>
+    <dl class="room-energy-card-facts">
+      <div><dt>Current power</dt><dd data-room-current-power>{{.CurrentPower}}</dd></div>
+      <div><dt>Today</dt><dd>{{.TodayEnergy}}</dd></div>
+      <div><dt>Allocated cost today</dt><dd>{{.TodayCost}}</dd></div>
+      <div><dt>Billing cycle</dt><dd>{{.BillingEnergy}}</dd></div>
+      <div><dt>Allocated billing-cycle cost</dt><dd>{{.BillingCost}}</dd></div>
+      <div><dt>House share</dt><dd>{{.HouseShare}}</dd></div>
+    </dl>
+    <footer><span data-room-sources>{{.ReportingSources}} of {{.ExpectedSources}} sources reporting</span><time data-room-last-update>{{.LastUpdate}}</time></footer>
+  </article>
+  {{else}}
+  <article class="panel room-energy-empty"><h3>No room meters configured</h3><p>Assign a tested Shelly component to a room to begin collecting room history.</p><a class="button primary" href="/energy/rooms/settings">Configure room metering</a></article>
+  {{end}}
+
+  {{with .RoomEnergy.Unmetered}}
+  <article class="panel room-energy-card room-energy-unmetered quality-border-{{.Quality}}" data-room-card data-room-virtual="true">
+    <header>
+      <div class="room-energy-card-title"><span class="room-energy-icon" aria-hidden="true">∑</span><div><h3>Unmetered / Other</h3><span class="room-energy-tag">Calculated bucket</span></div></div>
+      <span class="room-energy-quality quality-{{.Quality}}">{{.Quality}}</span>
+    </header>
+    <dl class="room-energy-card-facts">
+      <div><dt>Current power</dt><dd>{{.CurrentPower}}</dd></div>
+      <div><dt>Today</dt><dd>{{.TodayEnergy}}</dd></div>
+      <div><dt>Allocated cost today</dt><dd>{{.TodayCost}}</dd></div>
+      <div><dt>Billing cycle</dt><dd>{{.BillingEnergy}}</dd></div>
+      <div><dt>Allocated billing-cycle cost</dt><dd>{{.BillingCost}}</dd></div>
+      <div><dt>Not covered</dt><dd>{{.HouseShare}}</dd></div>
+    </dl>
+    <footer><span>Difference from the main meter</span><time>{{.LastUpdate}}</time></footer>
+  </article>
+  {{end}}
+</section>
 {{end}}
 
 {{define "room-energy-range-controls"}}
@@ -312,7 +316,7 @@
   <div class="room-energy-assignment-list">
     {{range .RoomEnergy.Settings.Assignments}}
     {{$assignment := .}}
-    <details class="room-energy-assignment state-{{.State}}" {{if or (eq .State "active") (eq .State "Active")}}open{{end}}>
+    <details id="room-energy-assignment-{{.ID}}" class="room-energy-assignment state-{{.State}}" {{if or (eq .State "active") (eq .State "Active")}}open{{end}}>
       <summary>
         <span><strong>{{.DisplayName}}</strong><small>{{.DeviceName}} · {{.ComponentKey}} → {{.RoomName}}</small></span>
         <span class="room-energy-assignment-badges"><span class="room-energy-tag">{{.Role}}</span><span class="room-energy-tag state">{{.State}}</span></span>
@@ -383,11 +387,25 @@
   <div class="room-energy-discovery-heading"><strong>{{.DeviceName}}</strong><span>{{len .Components}} usable components</span></div>
   {{range .Components}}
   <article class="room-energy-component">
-    <header><div><h4>{{.Label}}</h4><code>{{.Key}} · {{.Type}}</code></div><span class="room-energy-tag">Discovered</span></header>
+    <header><div><h4>{{.Label}}</h4><code>{{.Key}} · {{.Type}}</code></div>{{if .Assignments}}<span class="room-energy-tag is-configured">Configured</span>{{else}}<span class="room-energy-tag">Available</span>{{end}}</header>
     <form class="room-energy-inline-form" method="post" action="/energy/rooms/assignments/test" hx-post="/energy/rooms/assignments/test" hx-target="next .room-energy-test-result" hx-swap="innerHTML">
       <input type="hidden" name="_csrf" value="{{$.CSRF}}"><input type="hidden" name="device_id" value="{{$.RoomEnergy.Settings.Discovery.DeviceID}}"><input type="hidden" name="component_key" value="{{.Key}}"><button class="button secondary">Test component</button>
     </form>
     <div class="room-energy-test-result" aria-live="polite"></div>
+    {{if .Assignments}}
+    <section class="room-energy-component-current" aria-label="Existing room-energy assignments">
+      <h5>Configured for room metering</h5>
+      <ul>
+      {{range .Assignments}}
+      <li><a href="#room-energy-assignment-{{.ID}}">
+          <span><b>{{.RoomName}}</b><small>{{.DisplayName}}</small></span>
+          <span class="room-energy-assignment-badges"><span class="room-energy-tag">{{.Role}}</span><span class="room-energy-tag state">{{.State}}</span></span>
+      </a></li>
+      {{end}}
+      </ul>
+      <p>Select a record to manage it in the assignment history below.</p>
+    </section>
+    {{else}}
     <details class="room-energy-component-assignment"><summary>Assign to a room</summary>
       <form class="form-grid" method="post" action="/energy/rooms/assignments">
         <input type="hidden" name="_csrf" value="{{$.CSRF}}"><input type="hidden" name="device_id" value="{{$.RoomEnergy.Settings.Discovery.DeviceID}}"><input type="hidden" name="component_key" value="{{.Key}}">
@@ -402,6 +420,7 @@
         <button class="button primary">Test again and save assignment</button>
       </form>
     </details>
+    {{end}}
   </article>
   {{end}}
   {{else}}<p class="empty">No usable energy or power component was discovered on this device.</p>{{end}}

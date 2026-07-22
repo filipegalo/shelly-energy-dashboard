@@ -76,7 +76,7 @@ func (s *Server) energyPage(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	s.render(w, r, viewData{Page: "energy", Title: "Energy", Energy: view})
+	s.render(w, r, viewData{Page: "energy", Title: "Whole House", Energy: view})
 }
 
 func (s *Server) buildEnergyDashboard(r *http.Request) (energyView, error) {

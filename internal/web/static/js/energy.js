@@ -4,6 +4,8 @@
 
   const status = document.getElementById("energy-chart-status");
   const rangeButtons = Array.from(document.querySelectorAll("[data-energy-range]"));
+  const pageURL = canvas.dataset.energyPage || window.location.pathname;
+  const refreshDashboardPartials = canvas.dataset.refreshPartials === "true";
   let chart = null;
   let selectedRange = rangeButtons.find((button) => button.classList.contains("active"))?.dataset.energyRange || "24h";
   let selectedQuery = `range=${encodeURIComponent(selectedRange)}`;
@@ -63,8 +65,8 @@
       const hasData = payload.points.some((point) => point.energy_kwh !== null);
       status.textContent = hasData ? "" : "No readings in this range yet.";
       status.hidden = hasData;
-      window.history.replaceState(null, "", `/energy?${query}`);
-      if (refreshSummary) refreshPartials(query);
+      window.history.replaceState(null, "", `${pageURL}?${query}`);
+      if (refreshSummary && refreshDashboardPartials) refreshPartials(query);
     } catch (error) {
       status.hidden = false;
       status.textContent = error instanceof Error ? error.message : "Could not load energy history.";
@@ -87,6 +89,20 @@
     const node = document.getElementById(id);
     if (node) node.textContent = value;
   };
+  const livePanel = document.querySelector("[data-energy-live-panel]");
+  const liveState = document.querySelector("[data-energy-live-state]");
+  const freshnessValue = document.querySelector("[data-energy-freshness-value]");
+  const freshnessDetail = document.querySelector("[data-energy-freshness-detail]");
+  const healthCard = document.querySelector("[data-energy-meter-health]");
+  const healthIcon = document.querySelector("[data-energy-health-icon]");
+  const healthTitle = document.querySelector("[data-energy-health-title]");
+  const healthMessage = document.querySelector("[data-energy-health-message]");
+  const healthLink = document.querySelector("[data-energy-health-link]");
+  const setStateClass = (node, stateClass, classes) => {
+    if (!node) return;
+    classes.forEach((name) => node.classList.remove(name));
+    node.classList.add(stateClass);
+  };
   let lastChartRefresh = 0;
   const stream = new EventSource("/energy/events");
   const updateLive = (event) => {
@@ -102,6 +118,24 @@
       ? `${state.last_error || "Meter offline"} · ${lastKnown}`
       : (state.stale ? lastKnown : "Updated just now");
     updateText("energy-live-status", liveStatus);
+    const stateKind = !state.online ? "error" : (state.stale ? "warning" : "healthy");
+    livePanel?.classList.toggle("energy-stale", state.stale === true);
+    setStateClass(liveState, `is-${stateKind}`, ["is-healthy", "is-warning", "is-error"]);
+    if (freshnessValue) {
+      freshnessValue.textContent = stateKind === "healthy" ? "Live" : (stateKind === "warning" ? "Stale" : "Offline");
+      setStateClass(freshnessValue, stateKind === "healthy" ? "green" : (stateKind === "warning" ? "amber" : "red"), ["green", "amber", "red"]);
+    }
+    if (freshnessDetail) freshnessDetail.textContent = liveStatus;
+    if (healthCard) {
+      setStateClass(healthCard, `is-${stateKind}`, ["is-healthy", "is-warning", "is-error"]);
+      if (healthIcon) healthIcon.textContent = stateKind === "healthy" ? "✓" : "!";
+      if (healthTitle) healthTitle.textContent = stateKind === "healthy" ? "Main meter is reporting" : (stateKind === "warning" ? "Main meter reading is stale" : "Main meter offline");
+      if (healthMessage) healthMessage.textContent = liveStatus;
+      if (healthLink) {
+        healthLink.href = stateKind === "error" ? "/energy/settings" : "/energy";
+        healthLink.textContent = stateKind === "error" ? "Review meter" : "View details";
+      }
+    }
     const now = Date.now();
     if (now - lastChartRefresh > 60000) {
       lastChartRefresh = now;

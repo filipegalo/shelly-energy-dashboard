@@ -27,23 +27,7 @@
 
 {{template "energy-summary" .}}
 
-<section class="panel energy-chart-panel">
-  <div class="panel-head">
-    <div><p class="eyebrow">HISTORY</p><h3>Consumption and estimated variable cost</h3></div>
-    <div class="energy-range" role="group" aria-label="Energy chart range">
-      <button type="button" data-energy-range="24h" class="{{if eq .Energy.SelectedRange "24h"}}active{{end}}">24h</button>
-      <button type="button" data-energy-range="7d" class="{{if eq .Energy.SelectedRange "7d"}}active{{end}}">7d</button>
-      <button type="button" data-energy-range="30d" class="{{if eq .Energy.SelectedRange "30d"}}active{{end}}">30d</button>
-      <button type="button" data-energy-range="billing" class="{{if eq .Energy.SelectedRange "billing"}}active{{end}}">Billing cycle</button>
-      <button type="button" data-energy-range="previous_billing" class="{{if eq .Energy.SelectedRange "previous_billing"}}active{{end}}">Previous cycle</button>
-      <button type="button" data-energy-range="month" class="{{if eq .Energy.SelectedRange "month"}}active{{end}}">Month</button>
-    </div>
-  </div>
-  <form id="energy-custom-range" class="energy-custom-range"><label>From<input type="date" name="start" required></label><label>To<input type="date" name="end" required></label><button class="button secondary">Custom range</button></form>
-  <div id="energy-chart-status" class="energy-chart-status">Loading history…</div>
-  <div class="energy-chart-wrap"><canvas id="energy-chart" aria-label="Energy use and cost chart"></canvas></div>
-  <p class="energy-footnote">Estimated variable electricity cost includes configured VAT and excise tax. It excludes fixed invoice charges and exported energy.</p>
-</section>
+{{template "energy-chart" .}}
 
 <section class="two-col energy-details">
   {{template "energy-cost-breakdown" .}}
@@ -60,6 +44,26 @@
 <script defer src="/static/js/chart.umd.js"></script>
 <script defer src="/static/js/energy.js"></script>
 {{end}}
+{{end}}
+
+{{define "energy-chart"}}
+<section class="panel energy-chart-panel {{if eq .Page "dashboard"}}dashboard-chart{{end}}">
+  <div class="panel-head">
+    <div><p class="eyebrow">ENERGY HISTORY</p><h3>Energy use and cost chart</h3></div>
+    <div class="energy-range" role="group" aria-label="Energy chart range">
+      <button type="button" data-energy-range="24h" class="{{if eq .Energy.SelectedRange "24h"}}active{{end}}">24h</button>
+      <button type="button" data-energy-range="7d" class="{{if eq .Energy.SelectedRange "7d"}}active{{end}}">7d</button>
+      <button type="button" data-energy-range="30d" class="{{if eq .Energy.SelectedRange "30d"}}active{{end}}">30d</button>
+      <button type="button" data-energy-range="billing" class="{{if eq .Energy.SelectedRange "billing"}}active{{end}}">Billing cycle</button>
+      <button type="button" data-energy-range="previous_billing" class="{{if eq .Energy.SelectedRange "previous_billing"}}active{{end}}">Previous cycle</button>
+      <button type="button" data-energy-range="month" class="{{if eq .Energy.SelectedRange "month"}}active{{end}}">Month</button>
+    </div>
+  </div>
+  <form id="energy-custom-range" class="energy-custom-range"><label>From<input type="date" name="start" required></label><label>To<input type="date" name="end" required></label><button class="button secondary">Custom range</button></form>
+  <div id="energy-chart-status" class="energy-chart-status">Loading history…</div>
+  <div class="energy-chart-wrap"><canvas id="energy-chart" data-energy-page="{{if eq .Page "dashboard"}}/{{else}}/energy{{end}}" data-refresh-partials="{{if eq .Page "energy"}}true{{else}}false{{end}}" aria-label="Energy use and cost chart"></canvas></div>
+  <p class="energy-footnote">Estimated variable electricity cost includes configured VAT and excise tax. It excludes fixed invoice charges and exported energy.</p>
+</section>
 {{end}}
 
 {{define "energy-summary"}}

@@ -165,9 +165,10 @@ type roomEnergyDiscoveryVM struct {
 }
 
 type roomEnergyComponentVM struct {
-	Key   string
-	Type  string
-	Label string
+	Key         string
+	Type        string
+	Label       string
+	Assignments []roomEnergyAssignmentVM
 }
 
 type roomEnergyTestVM struct {

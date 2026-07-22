@@ -136,7 +136,11 @@ func NewWithEnergy(store *database.Store, manager *scans.Manager, energyManager 
 	if err != nil {
 		return nil, err
 	}
-	return &Server{store: store, manager: manager, energy: energyManager, roomEnergy: energyManager, cfg: cfg, logger: logger, cipher: cipher, views: views, metrics: registryHandler}, nil
+	server := &Server{store: store, manager: manager, energy: energyManager, cfg: cfg, logger: logger, cipher: cipher, views: views, metrics: registryHandler}
+	if energyManager != nil {
+		server.roomEnergy = energyManager
+	}
+	return server, nil
 }
 
 func (s *Server) Router() http.Handler {
@@ -221,14 +225,30 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	devices, _ := s.store.ListDevices(r.Context(), database.DeviceFilter{})
-	rooms, _ := s.store.ListRooms(r.Context())
-	networkList, _ := s.store.ListNetworks(r.Context(), true)
-	scanList, _ := s.store.ListScans(r.Context(), 5)
-	if len(devices) > 8 {
-		devices = devices[:8]
+	energyDashboard, err := s.buildEnergyDashboard(r)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
 	}
-	s.render(w, r, viewData{Page: "dashboard", Title: "Dashboard", Stats: stats, Devices: devices, Rooms: rooms, Networks: networkList, Scans: scanList})
+	roomDashboard, err := s.buildRoomEnergyOverview(r)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	networkList, err := s.store.ListNetworks(r.Context(), true)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	scanList, err := s.store.ListScans(r.Context(), 5)
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	s.render(w, r, viewData{
+		Page: "dashboard", Title: "Energy Overview", Stats: stats, Networks: networkList, Scans: scanList,
+		Energy: energyDashboard, RoomEnergy: &roomDashboard,
+	})
 }
 
 func (s *Server) devicesPage(w http.ResponseWriter, r *http.Request) {
@@ -316,7 +336,7 @@ func (s *Server) roomsPage(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	s.render(w, r, viewData{Page: "rooms", Title: "Rooms", Rooms: rooms})
+	s.render(w, r, viewData{Page: "rooms", Title: "Room Setup", Rooms: rooms})
 }
 
 func (s *Server) roomPage(w http.ResponseWriter, r *http.Request) {
@@ -447,7 +467,7 @@ func (s *Server) scansPage(w http.ResponseWriter, r *http.Request) {
 		s.serverError(w, r, err)
 		return
 	}
-	s.render(w, r, viewData{Page: "scans", Title: "Scans", Scans: scanList})
+	s.render(w, r, viewData{Page: "scans", Title: "Scan History", Scans: scanList})
 }
 
 func (s *Server) scanPage(w http.ResponseWriter, r *http.Request) {

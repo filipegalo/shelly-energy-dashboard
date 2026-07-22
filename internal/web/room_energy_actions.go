@@ -39,26 +39,37 @@ func (s *Server) discoverRoomEnergyComponents(w http.ResponseWriter, r *http.Req
 			}
 		}
 	}
+	view, viewErr := s.buildRoomEnergySettings(r)
+	if viewErr != nil {
+		s.serverError(w, r, viewErr)
+		return
+	}
+	view.Settings.Discovery = discoveryWithAssignments(discovery, view.Settings.Assignments)
 	if r.Header.Get("HX-Request") == "true" {
-		view, viewErr := s.buildRoomEnergySettings(r)
-		if viewErr != nil {
-			s.serverError(w, r, viewErr)
-			return
-		}
-		view.Settings.Discovery = discovery
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if executeErr := s.views.ExecuteTemplate(w, "room-energy-discovery", viewData{CSRF: csrfToken(r), RoomEnergy: &view}); executeErr != nil {
 			s.serverError(w, r, executeErr)
 		}
 		return
 	}
-	view, viewErr := s.buildRoomEnergySettings(r)
-	if viewErr != nil {
-		s.serverError(w, r, viewErr)
-		return
-	}
-	view.Settings.Discovery = discovery
 	s.render(w, r, viewData{Page: "energy-room-settings", Title: "Room metering", RoomEnergy: &view})
+}
+
+func discoveryWithAssignments(discovery roomEnergyDiscoveryVM, assignments []roomEnergyAssignmentVM) roomEnergyDiscoveryVM {
+	result := discovery
+	result.Components = make([]roomEnergyComponentVM, 0, len(discovery.Components))
+	for _, component := range discovery.Components {
+		enriched := component
+		enriched.Assignments = make([]roomEnergyAssignmentVM, 0)
+		for _, assignment := range assignments {
+			if assignment.DeviceID != discovery.DeviceID || assignment.ComponentKey != component.Key || assignment.State == "historical" {
+				continue
+			}
+			enriched.Assignments = append(enriched.Assignments, assignment)
+		}
+		result.Components = append(result.Components, enriched)
+	}
+	return result
 }
 
 func (s *Server) testRoomEnergyComponent(w http.ResponseWriter, r *http.Request) {

@@ -284,6 +284,7 @@ span.room-energy-quality { padding: 4px 8px; border: 1px solid currentColor; }
 .room-energy-component { padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: #12191e; }
 .room-energy-component + .room-energy-component { margin-top: 9px; }
 .room-energy-component h4 { margin: 0 0 2px; }
+.room-energy-tag.is-configured { border-color: #357664; background: #112823; color: #70ddb5; }
 .room-energy-inline-form { margin: 12px 0 0; }
 .room-energy-test-result:empty { display: none; }
 .room-energy-test { margin-top: 11px; padding: 13px; border: 1px solid #357664; border-radius: 9px; background: #112823; }
@@ -294,6 +295,15 @@ span.room-energy-quality { padding: 4px 8px; border: 1px solid currentColor; }
 .room-energy-test dl div { padding: 8px; border-radius: 6px; background: rgba(0, 0, 0, .16); }
 .room-energy-test dd { margin: 2px 0 0; }
 .room-energy-component-assignment { margin-top: 11px; background: #0c1216; }
+.room-energy-component-current { display: grid; gap: 8px; margin-top: 11px; padding: 12px; border: 1px solid #357664; border-radius: 9px; background: #10221e; }
+.room-energy-component-current h5 { margin: 0; color: #70ddb5; font-size: 13px; }
+.room-energy-component-current ul { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.room-energy-component-current a { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px; border: 1px solid #2f5448; border-radius: 7px; background: #0c1916; }
+.room-energy-component-current a:hover { border-color: #4b8b75; }
+.room-energy-component-current a > span:first-child { display: grid; min-width: 0; }
+.room-energy-component-current b { overflow: hidden; color: var(--text); text-overflow: ellipsis; white-space: nowrap; }
+.room-energy-component-current small,
+.room-energy-component-current p { margin: 0; color: var(--muted); font-size: 12px; }
 .room-energy-component-assignment > summary,
 .room-energy-assignment-action > summary { padding: 10px 12px; cursor: pointer; color: #c0cbd2; font-weight: 650; }
 .room-energy-component-assignment > form { padding: 0 12px 13px; }
@@ -389,6 +399,7 @@ span.room-energy-quality { padding: 4px 8px; border: 1px solid currentColor; }
   .room-energy-source > header,
   .room-energy-component > header { flex-direction: column; }
   .room-energy-source-badges { justify-content: start; }
+  .room-energy-component-current a { align-items: start; flex-direction: column; }
   .room-energy-children { margin-left: 5px; padding-left: 9px; }
 }
 

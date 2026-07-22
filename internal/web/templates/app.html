@@ -15,20 +15,32 @@
 <body>
 <div class="shell">
   <aside class="sidebar">
-    <a class="brand" href="/"><span class="brand-mark">S</span><span><strong>Shelly Inventory</strong><small>Local device intelligence</small></span></a>
-    <nav>
-      <a href="/" class="{{if eq .Page "dashboard"}}active{{end}}">Dashboard</a>
-      <a href="/devices" class="{{if or (eq .Page "devices") (eq .Page "device")}}active{{end}}">Devices</a>
-      <a href="/rooms" class="{{if or (eq .Page "rooms") (eq .Page "room")}}active{{end}}">Rooms</a>
-      <a href="/networks" class="{{if eq .Page "networks"}}active{{end}}">Networks</a>
-      <a href="/energy" class="{{if or (eq .Page "energy") (eq .Page "energy-settings") (eq .Page "energy-rooms") (eq .Page "energy-room") (eq .Page "energy-room-settings") (eq .Page "energy-reconciliation")}}active{{end}}">Energy</a>
-      <a href="/scans" class="{{if or (eq .Page "scans") (eq .Page "scan")}}active{{end}}">Scan history</a>
-      <a href="/settings" class="{{if eq .Page "settings"}}active{{end}}">Settings</a>
+    <a class="brand" href="/"><span class="brand-mark">S</span><span><strong>Shelly Inventory</strong><small>Local home energy</small></span></a>
+    <nav aria-label="Primary navigation">
+      <div class="nav-group">
+        <span class="nav-label">Energy</span>
+        <a href="/" class="{{if eq .Page "dashboard"}}active{{end}}" {{if eq .Page "dashboard"}}aria-current="page"{{end}}>Overview</a>
+        <a href="/energy" class="{{if eq .Page "energy"}}active{{end}}" {{if eq .Page "energy"}}aria-current="page"{{end}}>Whole House</a>
+        <a href="/energy/rooms" class="{{if or (eq .Page "energy-rooms") (eq .Page "energy-room")}}active{{end}}" {{if or (eq .Page "energy-rooms") (eq .Page "energy-room")}}aria-current="page"{{end}}>Rooms</a>
+        <a href="/energy/rooms/reconciliation" class="{{if eq .Page "energy-reconciliation"}}active{{end}}" {{if eq .Page "energy-reconciliation"}}aria-current="page"{{end}}>Reconciliation</a>
+        <a href="/energy/settings" class="{{if or (eq .Page "energy-settings") (eq .Page "energy-room-settings")}}active{{end}}" {{if or (eq .Page "energy-settings") (eq .Page "energy-room-settings")}}aria-current="page"{{end}}>Energy Settings</a>
+      </div>
+      <div class="nav-group">
+        <span class="nav-label">Shelly Management</span>
+        <a href="/devices" class="{{if or (eq .Page "devices") (eq .Page "device")}}active{{end}}" {{if or (eq .Page "devices") (eq .Page "device")}}aria-current="page"{{end}}>Devices</a>
+        <a href="/rooms" class="{{if or (eq .Page "rooms") (eq .Page "room")}}active{{end}}" {{if or (eq .Page "rooms") (eq .Page "room")}}aria-current="page"{{end}}>Room Setup</a>
+        <a href="/networks" class="{{if eq .Page "networks"}}active{{end}}" {{if eq .Page "networks"}}aria-current="page"{{end}}>Networks</a>
+        <a href="/scans" class="{{if or (eq .Page "scans") (eq .Page "scan")}}active{{end}}" {{if or (eq .Page "scans") (eq .Page "scan")}}aria-current="page"{{end}}>Scan History</a>
+      </div>
+      <div class="nav-group">
+        <span class="nav-label">System</span>
+        <a href="/settings" class="{{if eq .Page "settings"}}active{{end}}" {{if eq .Page "settings"}}aria-current="page"{{end}}>Settings</a>
+      </div>
     </nav>
     <div class="local-only"><span></span><div><strong>Local only</strong><small>No Shelly Cloud</small></div></div>
   </aside>
   <main>
-    <header class="topbar"><div><p class="eyebrow">SHELLY INVENTORY</p><h1>{{.Title}}</h1></div></header>
+    <header class="topbar"><div><p class="eyebrow">LOCAL HOME ENERGY</p><h1>{{.Title}}</h1></div></header>
     {{if or (eq .Page "energy") (eq .Page "energy-settings")}}{{template "energy-subnav" .}}{{end}}
     {{if eq .Page "dashboard"}}{{template "dashboard" .}}{{end}}
     {{if eq .Page "devices"}}{{template "devices" .}}{{end}}
@@ -50,23 +62,78 @@
 </body></html>{{end}}
 
 {{define "dashboard"}}
-<section class="hero"><div><span class="pill">LAN INVENTORY</span><h2>Everything on your Shelly network,<br><em>clearly organized.</em></h2><p>Discover devices across routed VLANs, preserve their identity, and keep local operations local.</p></div>
-<form class="scan-card" method="post" action="/networks/{{if .Networks}}{{(index .Networks 0).ID}}{{end}}/scan">
-  <input type="hidden" name="_csrf" value="{{.CSRF}}"><label>Scan a network<select class="network-chooser" name="network_chooser">{{range .Networks}}<option value="{{.ID}}">{{.Name}} · {{.CIDR}}</option>{{else}}<option>No enabled networks</option>{{end}}</select></label>
-  <button class="button primary" {{if not .Networks}}disabled{{end}}>Scan now <span>→</span></button><small>Runs safely in the background</small>
-</form></section>
-<section class="stats-grid">
-  <article><span>Total devices</span><strong>{{.Stats.TotalDevices}}</strong><small>Inventoried locally</small></article>
-  <article><span>Online</span><strong class="green">{{.Stats.OnlineDevices}}</strong><small>Responding now</small></article>
-  <article><span>Offline</span><strong class="red">{{.Stats.OfflineDevices}}</strong><small>After failure threshold</small></article>
-  <article><span>Needs auth</span><strong class="amber">{{.Stats.AuthDevices}}</strong><small>Credential required</small></article>
-  <article><span>Unassigned</span><strong>{{.Stats.UnassignedDevices}}</strong><small>Ready to organize</small></article>
-  <article><span>Running scans</span><strong>{{.Stats.RunningScans}}</strong><small>Background activity</small></article>
-  <article><span>Rooms</span><strong>{{.Stats.TotalRooms}}</strong><small>House divisions</small></article>
-  <article><span>Networks</span><strong>{{.Stats.TotalNetworks}}</strong><small>Scan boundaries</small></article>
+<section class="dashboard-intro">
+  <div><p class="eyebrow">YOUR HOME RIGHT NOW</p><h2>Your home right now</h2><p>Live consumption, cost, room coverage, and meter health—kept on your local network.</p></div>
+  <div class="dashboard-shortcuts" aria-label="Energy shortcuts">
+    <a class="button secondary" href="/energy">View whole-house energy</a>
+    <a class="button secondary" href="/energy/rooms">View room consumption</a>
+    <a class="button primary" href="/energy/settings">Configure energy meters</a>
+  </div>
 </section>
-<section class="two-col"><article class="panel"><div class="panel-head"><div><p class="eyebrow">INVENTORY</p><h3>Recently seen devices</h3></div><a href="/devices">View all</a></div>{{template "device-table" .}}</article>
-<article class="panel"><div class="panel-head"><div><p class="eyebrow">ORGANIZATION</p><h3>Rooms</h3></div><a href="/rooms">Manage</a></div><div class="room-list">{{range .Rooms}}<a href="/rooms/{{.ID}}"><span class="room-icon">{{.Icon}}</span><span><strong>{{.Name}}</strong><small>{{.DeviceCount}} devices · {{.OnlineCount}} online</small></span><b>›</b></a>{{end}}</div></article></section>
+
+{{if .Energy.Onboarding}}
+<section class="panel dashboard-onboarding">
+  <div class="dashboard-onboarding-mark" aria-hidden="true">⚡</div>
+  <div><p class="eyebrow">WHOLE-HOUSE MONITORING</p><h2>Connect your main Shelly energy meter</h2><p>Choose and test an existing Shelly meter to start showing real power, consumption, cost, and room allocation here.</p></div>
+  <a class="button primary" href="/energy/settings">Configure energy meters</a>
+</section>
+{{else}}
+<section class="dashboard-live" aria-label="Current home energy">
+  <article class="panel dashboard-live-primary {{if .Energy.Live.Stale}}energy-stale{{end}}" data-energy-live-panel>
+    <p class="eyebrow">Current whole-house power</p>
+    <strong id="energy-live-power">{{formatPower .Energy.Live.Reading.PowerW}}</strong>
+    <span id="energy-live-status" data-energy-live-state class="dashboard-meter-state {{if .Energy.Live.Online}}{{if .Energy.Live.Stale}}is-warning{{else}}is-healthy{{end}}{{else}}is-error{{end}}">{{if .Energy.Live.Online}}{{relativeTime .Energy.Live.Reading.Timestamp}}{{else}}Meter offline{{end}}</span>
+  </article>
+  <article class="panel dashboard-today"><span>Consumption today</span><strong>{{if .Energy.Today.HasData}}{{.Energy.Today.ConsumptionKWh}} kWh{{else}}—{{end}}</strong><small>{{if .Energy.Today.HasData}}Measured since midnight{{else}}Waiting for readings{{end}}</small></article>
+  <article class="panel dashboard-cost"><span>Estimated cost today</span><strong>{{if .Energy.Today.HasData}}€{{.Energy.Today.CostEUR}}{{else}}—{{end}}</strong><small>Configured variable electricity cost</small></article>
+</section>
+
+<section class="dashboard-metrics" aria-label="Home energy summary">
+  <article class="panel"><span>Current billing cycle</span><strong>{{if .Energy.Billing.HasData}}{{.Energy.Billing.ConsumptionKWh}} kWh{{else}}—{{end}}</strong><small>{{formatDate .Energy.BillingStart}} – {{formatEndDate .Energy.BillingEnd}}</small></article>
+  <article class="panel"><span>Billing-cycle estimate</span><strong>{{if .Energy.Billing.HasData}}€{{.Energy.Billing.CostEUR}}{{else}}—{{end}}</strong><small>Variable electricity cost</small></article>
+  <article class="panel"><span>Meter coverage</span><strong>{{.RoomEnergy.Overview.Coverage}}</strong><small>Room meters / whole house today</small></article>
+  <article class="panel"><span>Meter freshness</span><strong data-energy-freshness-value class="{{if .Energy.Live.Stale}}amber{{else if .Energy.Live.Online}}green{{else}}red{{end}}">{{if .Energy.Live.Stale}}Stale{{else if .Energy.Live.Online}}Live{{else}}Offline{{end}}</strong><small data-energy-freshness-detail>{{relativeTime .Energy.Live.Reading.Timestamp}}</small></article>
+</section>
+
+{{template "energy-chart" .}}
+{{end}}
+
+<section class="dashboard-section">
+  <div class="dashboard-section-head"><div><p class="eyebrow">ROOM ENERGY</p><h2>Energy by room</h2><p>See how measured consumption and allocated cost are distributed through your home.</p></div><a class="button secondary" href="/energy/rooms">All room dashboards</a></div>
+  {{if .RoomEnergy.Configured}}{{template "room-energy-cards" .}}{{else}}<article class="panel dashboard-empty"><p>Room energy appears after the whole-house meter is configured. You can prepare room sources now.</p><a class="button secondary" href="/energy/rooms/settings">Configure room meters</a></article>{{end}}
+</section>
+
+<section class="dashboard-section">
+  <div class="dashboard-section-head"><div><p class="eyebrow">ENERGY HEALTH</p><h2>Energy health</h2><p>Only states reported by your configured meters and reconciliation data are shown.</p></div><a href="/energy/rooms/reconciliation">View reconciliation</a></div>
+  <div class="dashboard-health-list">
+    {{if .Energy.Onboarding}}<article class="dashboard-health-item is-warning"><span>!</span><div><strong>Main meter not configured</strong><p>Connect a whole-house source to start monitoring energy.</p></div><a href="/energy/settings">Configure</a></article>{{else}}
+      <article class="dashboard-health-item {{if not .Energy.Live.Online}}is-error{{else if .Energy.Live.Stale}}is-warning{{else}}is-healthy{{end}}" data-energy-meter-health>
+        <span data-energy-health-icon>{{if or (not .Energy.Live.Online) .Energy.Live.Stale}}!{{else}}✓{{end}}</span>
+        <div><strong data-energy-health-title>{{if not .Energy.Live.Online}}Main meter offline{{else if .Energy.Live.Stale}}Main meter reading is stale{{else}}Main meter is reporting{{end}}</strong><p data-energy-health-message>{{if not .Energy.Live.Online}}{{if .Energy.Live.LastError}}{{.Energy.Live.LastError}}{{else}}The latest collector state is offline.{{end}}{{else}}{{relativeTime .Energy.Live.Reading.Timestamp}}{{end}}</p></div>
+        <a data-energy-health-link href="{{if not .Energy.Live.Online}}/energy/settings{{else}}/energy{{end}}">{{if not .Energy.Live.Online}}Review meter{{else}}View details{{end}}</a>
+      </article>
+      {{if and .RoomEnergy.Configured (not (eq .RoomEnergy.Overview.Quality "complete"))}}<article class="dashboard-health-item is-warning"><span>!</span><div><strong>Room energy data is {{.RoomEnergy.Overview.Quality}}</strong><p>Reconciliation: {{.RoomEnergy.Overview.Status}}. Missing readings remain visible as gaps.</p></div><a href="/energy/rooms/reconciliation">Review</a></article>{{else}}<article class="dashboard-health-item is-healthy"><span>✓</span><div><strong>Room metering is healthy</strong><p>Configured room sources are reporting complete data.</p></div><a href="/energy/rooms">View rooms</a></article>{{end}}
+    {{end}}
+  </div>
+</section>
+
+<section class="panel dashboard-shelly">
+  <div class="dashboard-section-head"><div><p class="eyebrow">SHELLY MANAGEMENT</p><h2>Shelly devices</h2><p>Your local meters, relays, and network discovery foundation.</p></div><a class="button secondary" href="/devices">Manage devices</a></div>
+  <div class="dashboard-shelly-grid">
+    <div><span>Total devices</span><strong>{{.Stats.TotalDevices}}</strong></div>
+    <div><span>Online</span><strong class="green">{{.Stats.OnlineDevices}}</strong></div>
+    <div><span>Offline</span><strong class="red">{{.Stats.OfflineDevices}}</strong></div>
+    <div><span>Needs authentication</span><strong class="amber">{{.Stats.AuthDevices}}</strong></div>
+    <div><span>Networks</span><strong>{{.Stats.TotalNetworks}}</strong></div>
+    <div><span>Last discovery scan</span>{{if .Scans}}{{with (index .Scans 0)}}<strong class="dashboard-scan-status">{{.Status}}</strong><small><a href="/scans/{{.ID}}">{{formatTime .CreatedAt}}</a></small>{{end}}{{else}}<strong class="dashboard-scan-status">Never</strong><small><a href="/scans">View scan history</a></small>{{end}}</div>
+  </div>
+  <form class="dashboard-scan-form" method="post" action="/networks/{{if .Networks}}{{(index .Networks 0).ID}}{{end}}/scan">
+    <input type="hidden" name="_csrf" value="{{.CSRF}}"><label>Network<select class="network-chooser" name="network_chooser">{{range .Networks}}<option value="{{.ID}}">{{.Name}} · {{.CIDR}}</option>{{else}}<option>No enabled networks</option>{{end}}</select></label>
+    <button class="button secondary" {{if not .Networks}}disabled{{end}}>Scan for Shelly devices</button><a href="/scans">Scan History</a>
+  </form>
+</section>
+
+{{if not .Energy.Onboarding}}<script defer src="/static/js/chart.umd.js"></script><script defer src="/static/js/energy.js"></script><script defer src="/static/js/room-energy.js"></script>{{end}}
 {{end}}
 
 {{define "devices"}}
@@ -87,8 +154,60 @@
 {{end}}
 
 {{define "rooms"}}
-<section class="rooms-grid">{{range .Rooms}}<article class="panel room-card"><div class="room-symbol">{{.Icon}}</div><h3><a href="/rooms/{{.ID}}">{{.Name}}</a></h3><p>{{.Description}}</p><div><span>{{.DeviceCount}} devices</span><span class="green">{{.OnlineCount}} online</span><span class="red">{{.OfflineCount}} offline</span></div>{{if not .IsSystem}}<details><summary>Edit room</summary><form class="stack" method="post" action="/rooms/{{.ID}}/update"><input type="hidden" name="_csrf" value="{{$.CSRF}}"><label>Name<input required name="name" value="{{.Name}}"></label><label>Description<textarea name="description">{{.Description}}</textarea></label><label>Icon<input name="icon" value="{{.Icon}}"></label><label>Sort order<input type="number" name="sort_order" value="{{.SortOrder}}"></label><button class="button secondary">Save room</button></form></details><form class="confirm-form" data-confirm="Delete this room? Devices move to Unassigned." method="post" action="/rooms/{{.ID}}/delete"><input type="hidden" name="_csrf" value="{{$.CSRF}}"><button class="link danger">Delete</button></form>{{end}}</article>{{end}}</section>
-<section class="panel narrow"><h3>Create a room</h3><form class="form-grid" method="post" action="/rooms"><input type="hidden" name="_csrf" value="{{.CSRF}}"><label>Name<input required maxlength="100" name="name"></label><label>Icon<input name="icon" value="home" maxlength="30"></label><label class="wide">Description<textarea name="description" maxlength="500"></textarea></label><label>Sort order<input type="number" name="sort_order" value="10"></label><button class="button primary">Create room</button></form></section>
+<section class="rooms-grid">
+  {{range .Rooms}}
+  <article class="panel room-card">
+    <div class="room-symbol">{{.Icon}}</div><h3><a href="/rooms/{{.ID}}">{{.Name}}</a></h3><p>{{.Description}}</p>
+    <div><span>{{.DeviceCount}} devices</span><span class="green">{{.OnlineCount}} online</span><span class="red">{{.OfflineCount}} offline</span></div>
+    {{if not .IsSystem}}
+    <details><summary>Edit room</summary><form class="stack" method="post" action="/rooms/{{.ID}}/update">
+      <input type="hidden" name="_csrf" value="{{$.CSRF}}"><label>Name<input required name="name" value="{{.Name}}"></label><label>Description<textarea name="description">{{.Description}}</textarea></label>
+      {{template "room-icon-picker" .Icon}}
+      <label>Sort order<input type="number" name="sort_order" value="{{.SortOrder}}"></label><button class="button secondary">Save room</button>
+    </form></details>
+    <form class="confirm-form" data-confirm="Delete this room? Devices move to Unassigned." method="post" action="/rooms/{{.ID}}/delete"><input type="hidden" name="_csrf" value="{{$.CSRF}}"><button class="link danger">Delete</button></form>
+    {{end}}
+  </article>
+  {{end}}
+</section>
+<section class="panel narrow"><h3>Create a room</h3><form class="form-grid" method="post" action="/rooms">
+  <input type="hidden" name="_csrf" value="{{.CSRF}}"><label>Name<input required maxlength="100" name="name"></label><label>Sort order<input type="number" name="sort_order" value="10"></label>
+  <label class="wide">Description<textarea name="description" maxlength="500"></textarea></label>
+  {{template "room-icon-picker" "🏠"}}
+  <button class="button primary">Create room</button>
+</form></section>
+{{end}}
+
+{{define "room-icon-picker"}}
+{{$current := .}}
+<fieldset class="room-icon-picker wide">
+  <legend>Room icon</legend>
+  <div class="room-icon-options">
+    {{if and $current (not (or (eq $current "🏠") (eq $current "🛋") (eq $current "🍳") (eq $current "🛏") (eq $current "💼") (eq $current "🛁") (eq $current "🚗") (eq $current "🧺") (eq $current "🍽") (eq $current "🚪") (eq $current "🌿") (eq $current "🛠") (eq $current "🏋") (eq $current "⚡") (eq $current "📦") (eq $current "🧸") (eq $current "🎮") (eq $current "☀") (eq $current "🔥") (eq $current "❄")))}}
+    <label class="room-icon-option"><input type="radio" name="icon" value="{{$current}}" checked><span class="room-icon-choice"><b aria-hidden="true">{{$current}}</b><small>Current icon: {{$current}}</small></span></label>
+    {{end}}
+    <label class="room-icon-option"><input type="radio" name="icon" value="🏠" {{if eq $current "🏠"}}checked{{end}}><span class="room-icon-choice"><b aria-hidden="true">🏠</b><small>Home</small></span></label>
+    <label class="room-icon-option"><input type="radio" name="icon" value="🛋" {{if eq $current "🛋"}}checked{{end}}><span class="room-icon-choice"><b aria-hidden="true">🛋</b><small>Living room</small></span></label>
+    <label class="room-icon-option"><input type="radio" name="icon" value="🍳" {{if eq $current "🍳"}}checked{{end}}><span class="room-icon-choice"><b aria-hidden="true">🍳</b><small>Kitchen</small></span></label>
+    <label class="room-icon-option"><input type="radio" name="icon" value="🛏" {{if eq $current "🛏"}}checked{{end}}><span class="room-icon-choice"><b aria-hidden="true">🛏</b><small>Bedroom</small></span></label>
+    <label class="room-icon-option"><input type="radio" name="icon" value="💼" {{if eq $current "💼"}}checked{{end}}><span class="room-icon-choice"><b aria-hidden="true">💼</b><small>Office</small></span></label>
+    <label class="room-icon-option"><input type="radio" name="icon" value="🛁" {{if eq $current "🛁"}}checked{{end}}><span class="room-icon-choice"><b aria-hidden="true">🛁</b><small>Bathroom</small></span></label>
+    <label class="room-icon-option"><input type="radio" name="icon" value="🚗" {{if eq $current "🚗"}}checked{{end}}><span class="room-icon-choice"><b aria-hidden="true">🚗</b><small>Garage</small></span></label>
+    <label class="room-icon-option"><input type="radio" name="icon" value="🧺" {{if eq $current "🧺"}}checked{{end}}><span class="room-icon-choice"><b aria-hidden="true">🧺</b><small>Laundry</small></span></label>
+    <label class="room-icon-option"><input type="radio" name="icon" value="🍽" {{if eq $current "🍽"}}checked{{end}}><span class="room-icon-choice"><b aria-hidden="true">🍽</b><small>Dining</small></span></label>
+    <label class="room-icon-option"><input type="radio" name="icon" value="🚪" {{if eq $current "🚪"}}checked{{end}}><span class="room-icon-choice"><b aria-hidden="true">🚪</b><small>Hallway</small></span></label>
+    <label class="room-icon-option"><input type="radio" name="icon" value="🌿" {{if eq $current "🌿"}}checked{{end}}><span class="room-icon-choice"><b aria-hidden="true">🌿</b><small>Garden</small></span></label>
+    <label class="room-icon-option"><input type="radio" name="icon" value="🛠" {{if eq $current "🛠"}}checked{{end}}><span class="room-icon-choice"><b aria-hidden="true">🛠</b><small>Workshop</small></span></label>
+    <label class="room-icon-option"><input type="radio" name="icon" value="🏋" {{if eq $current "🏋"}}checked{{end}}><span class="room-icon-choice"><b aria-hidden="true">🏋</b><small>Gym</small></span></label>
+    <label class="room-icon-option"><input type="radio" name="icon" value="⚡" {{if eq $current "⚡"}}checked{{end}}><span class="room-icon-choice"><b aria-hidden="true">⚡</b><small>Utility</small></span></label>
+    <label class="room-icon-option"><input type="radio" name="icon" value="📦" {{if eq $current "📦"}}checked{{end}}><span class="room-icon-choice"><b aria-hidden="true">📦</b><small>Storage</small></span></label>
+    <label class="room-icon-option"><input type="radio" name="icon" value="🧸" {{if eq $current "🧸"}}checked{{end}}><span class="room-icon-choice"><b aria-hidden="true">🧸</b><small>Nursery</small></span></label>
+    <label class="room-icon-option"><input type="radio" name="icon" value="🎮" {{if eq $current "🎮"}}checked{{end}}><span class="room-icon-choice"><b aria-hidden="true">🎮</b><small>Games</small></span></label>
+    <label class="room-icon-option"><input type="radio" name="icon" value="☀" {{if eq $current "☀"}}checked{{end}}><span class="room-icon-choice"><b aria-hidden="true">☀</b><small>Balcony</small></span></label>
+    <label class="room-icon-option"><input type="radio" name="icon" value="🔥" {{if eq $current "🔥"}}checked{{end}}><span class="room-icon-choice"><b aria-hidden="true">🔥</b><small>Boiler</small></span></label>
+    <label class="room-icon-option"><input type="radio" name="icon" value="❄" {{if eq $current "❄"}}checked{{end}}><span class="room-icon-choice"><b aria-hidden="true">❄</b><small>Climate</small></span></label>
+  </div>
+</fieldset>
 {{end}}
 
 {{define "room"}}<section class="detail-title"><div><p class="eyebrow">ROOM</p><h2>{{.Room.Name}}</h2><p>{{.Room.Description}}</p></div><a class="button secondary" href="/rooms">All rooms</a></section><section class="panel">{{template "device-table" .}}</section>{{end}}

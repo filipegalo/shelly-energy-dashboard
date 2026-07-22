@@ -94,7 +94,7 @@ func (s *Server) buildRoomEnergySettings(r *http.Request) (roomEnergyViewModel, 
 			ComponentKey: assignment.ComponentKey, ComponentType: assignment.ComponentType, DisplayName: assignment.DisplayName,
 			Role: assignment.AggregationRole, ParentName: assignment.ParentDisplayName, State: state, Enabled: assignment.Enabled,
 			MainMeter: config.DeviceID == assignment.DeviceID && config.ComponentKey == assignment.ComponentKey,
-			CanEdit:   state == "active", CanDisable: state == "active", CanDeleteFuture: state == "future",
+			CanEdit:   state == "active" || state == "disabled", CanDisable: state == "active", CanDeleteFuture: state == "future",
 			PollIntervalSeconds: assignment.PollIntervalSeconds, EffectiveFrom: assignment.EffectiveFrom, EffectiveTo: assignment.EffectiveTo, Parents: filtered,
 		})
 	}
