@@ -68,6 +68,39 @@ docker compose start shelly-inventory
 
 Keep the encryption key with the recovery procedure, but never in the same unprotected location as the database backup.
 
+## Migrate SQLite to PostgreSQL
+
+Stop the application before migration. The image includes a one-shot command that creates the PostgreSQL schema and copies all rows while preserving IDs:
+
+```bash
+docker run --rm \
+  --entrypoint /usr/local/bin/migrate-sqlite-to-postgres \
+  -v "${SHELLY_DATA_VOLUME}:/data:ro" \
+  -e DATABASE_USERNAME -e DATABASE_PASSWORD -e DATABASE_HOSTNAME \
+  -e DATABASE_PORT=5432 -e DATABASE_DB \
+  shelly-energy-dashboard:local --source /data/shelly-inventory.db
+```
+
+The target PostgreSQL database must be dedicated to this application. The command clears its application tables before copying, so it is safe to re-run only against an intended empty target. Keep the SQLite file and the same `APP_ENCRYPTION_KEY` until the new deployment has been verified.
+
+For a local validation using the supplied pre-Kubernetes SQLite archive, run:
+
+```bash
+docker compose -f docker-compose.postgres-migration-test.yml up --build --abort-on-container-exit --exit-code-from migrate
+docker compose -f docker-compose.postgres-migration-test.yml down -v
+```
+
+This starts an isolated PostgreSQL container, builds a temporary extractor image containing the archive, extracts it into a named volume, and runs the migration. It never writes to the archive or the original SQLite file; the temporary copy is made readable only so the unprivileged migrator can inspect it.
+
+To also start the dashboard against that migrated PostgreSQL database, omit `--abort-on-container-exit` and `--exit-code-from migrate`:
+
+```bash
+APP_ENCRYPTION_KEY='your-existing-32-byte-key' \
+  docker compose -f docker-compose.postgres-migration-test.yml up --build
+```
+
+The dashboard is then available at `http://127.0.0.1:8081`. The test Compose keeps PostgreSQL TLS disabled because it is an isolated local network; set `DATABASE_SSLMODE=require` or stronger in a real deployment.
+
 ## Upgrade considerations
 
 Before an upgrade:

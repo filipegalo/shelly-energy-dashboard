@@ -13,6 +13,12 @@ import (
 type Config struct {
 	ListenAddress            string
 	DatabasePath             string
+	DatabaseUsername         string
+	DatabasePassword         string
+	DatabaseHostname         string
+	DatabasePort             string
+	DatabaseDB               string
+	DatabaseSSLMode          string
 	EncryptionKey            []byte
 	LogLevel                 string
 	EnableMDNS               bool
@@ -32,6 +38,12 @@ func Load() (Config, error) {
 	cfg := Config{
 		ListenAddress:            env("APP_LISTEN_ADDRESS", "127.0.0.1:8080"),
 		DatabasePath:             env("APP_DATABASE_PATH", "./data/shelly-inventory.db"),
+		DatabaseUsername:         os.Getenv("DATABASE_USERNAME"),
+		DatabasePassword:         os.Getenv("DATABASE_PASSWORD"),
+		DatabaseHostname:         os.Getenv("DATABASE_HOSTNAME"),
+		DatabasePort:             env("DATABASE_PORT", "5432"),
+		DatabaseDB:               os.Getenv("DATABASE_DB"),
+		DatabaseSSLMode:          env("DATABASE_SSLMODE", "disable"),
 		LogLevel:                 env("APP_LOG_LEVEL", "info"),
 		EnableMDNS:               envBool("APP_ENABLE_MDNS", false),
 		AllowNonPrivateNetworks:  envBool("APP_ALLOW_NON_PRIVATE_NETWORKS", false),
@@ -44,6 +56,16 @@ func Load() (Config, error) {
 		AllowedHosts:             splitCSV(env("APP_ALLOWED_HOSTS", "localhost,127.0.0.1,[::1]")),
 		SecureCookies:            envBool("APP_SECURE_COOKIES", false),
 		MaxConcurrentScans:       envInt("APP_MAX_CONCURRENT_SCANS", 4),
+	}
+	postgresValues := []string{cfg.DatabaseUsername, cfg.DatabasePassword, cfg.DatabaseHostname, cfg.DatabaseDB}
+	postgresConfigured := 0
+	for _, value := range postgresValues {
+		if value != "" {
+			postgresConfigured++
+		}
+	}
+	if postgresConfigured != 0 && postgresConfigured != len(postgresValues) {
+		return Config{}, errors.New("DATABASE_USERNAME, DATABASE_PASSWORD, DATABASE_HOSTNAME, and DATABASE_DB must be set together")
 	}
 	key, err := encryptionKey(os.Getenv("APP_ENCRYPTION_KEY"))
 	if err != nil {
@@ -64,6 +86,8 @@ func Load() (Config, error) {
 	}
 	return cfg, nil
 }
+
+func (c Config) UsesPostgres() bool { return c.DatabaseHostname != "" }
 
 func splitCSV(raw string) []string {
 	values := []string{}

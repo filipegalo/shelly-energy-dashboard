@@ -33,7 +33,12 @@ func main() {
 		fatal("load configuration", err)
 	}
 	logger := newLogger(cfg.LogLevel)
-	store, err := database.Open(cfg.DatabasePath)
+	store, err := database.Open(database.Options{
+		SQLitePath: cfg.DatabasePath,
+		Postgres: database.PostgresOptions{
+			Username: cfg.DatabaseUsername, Password: cfg.DatabasePassword, Hostname: cfg.DatabaseHostname, Port: cfg.DatabasePort, Database: cfg.DatabaseDB, SSLMode: cfg.DatabaseSSLMode,
+		},
+	})
 	if err != nil {
 		fatal("open database", err)
 	}
@@ -65,7 +70,7 @@ func main() {
 	httpServer := &http.Server{Addr: cfg.ListenAddress, Handler: webServer.Router(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 35 * time.Second, WriteTimeout: 0, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 1 << 20}
 
 	go func() {
-		logger.Info("Shelly Inventory started", "operation", "startup", "listen_address", cfg.ListenAddress, "database_path", cfg.DatabasePath, "mdns_enabled", cfg.EnableMDNS)
+		logger.Info("Shelly Inventory started", "operation", "startup", "listen_address", cfg.ListenAddress, "database_backend", store.Backend(), "mdns_enabled", cfg.EnableMDNS)
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("HTTP server stopped", "operation", "serve", "error", err)
 			stop()

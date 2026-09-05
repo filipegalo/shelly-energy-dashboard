@@ -431,7 +431,7 @@ func floatPointer(value sql.NullFloat64) *float64 {
 	return &result
 }
 
-func deleteBefore(ctx context.Context, tx *sql.Tx, query string, cutoff time.Time) (int64, error) {
+func deleteBefore(ctx context.Context, tx *Tx, query string, cutoff time.Time) (int64, error) {
 	result, err := tx.ExecContext(ctx, query, timestamp(cutoff))
 	if err != nil {
 		return 0, err

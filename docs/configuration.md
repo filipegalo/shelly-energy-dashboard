@@ -8,6 +8,12 @@ Configuration is read from environment variables at startup. Settings saved on a
 |---|---:|---|
 | `APP_LISTEN_ADDRESS` | `127.0.0.1:8080` | HTTP bind address; Compose overrides this inside the container |
 | `APP_DATABASE_PATH` | `./data/shelly-inventory.db` | SQLite database file |
+| `DATABASE_USERNAME` | empty | PostgreSQL user; set together with the other `DATABASE_*` values to use PostgreSQL |
+| `DATABASE_PASSWORD` | empty | PostgreSQL password |
+| `DATABASE_HOSTNAME` | empty | PostgreSQL hostname |
+| `DATABASE_PORT` | `5432` | PostgreSQL port |
+| `DATABASE_DB` | empty | PostgreSQL database name |
+| `DATABASE_SSLMODE` | `disable` | PostgreSQL TLS mode; use `require` or stronger for a remote database |
 | `APP_ENCRYPTION_KEY` | empty | Required before saving credentials; raw or base64-encoded 32 bytes |
 | `APP_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, or `error` |
 | `APP_ENABLE_MDNS` | `false` | Browse `_shelly._tcp` and `_http._tcp`; candidates remain CIDR-restricted |

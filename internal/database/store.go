@@ -7,12 +7,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/filipegalo/shelly-energy-dashboard/internal/shelly"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "modernc.org/sqlite"
 )
 
@@ -20,10 +23,36 @@ import (
 var schema string
 
 type Store struct {
-	db *sql.DB
+	db      *DB
+	backend string
 }
 
-func Open(path string) (*Store, error) {
+type PostgresOptions struct {
+	Username, Password, Hostname, Port, Database, SSLMode string
+}
+
+type Options struct {
+	SQLitePath string
+	Postgres   PostgresOptions
+}
+
+// Open accepts either the legacy SQLite path or PostgreSQL connection options.
+// Keeping SQLite is intentional: it enables an offline source during migration.
+func Open(options any) (*Store, error) {
+	switch value := options.(type) {
+	case string:
+		return openSQLite(value)
+	case Options:
+		if value.Postgres.Hostname != "" {
+			return openPostgres(value.Postgres)
+		}
+		return openSQLite(value.SQLitePath)
+	default:
+		return nil, errors.New("database options must be a SQLite path or database.Options")
+	}
+}
+
+func openSQLite(path string) (*Store, error) {
 	directory := filepath.Dir(path)
 	_, statErr := os.Stat(directory)
 	createdDirectory := errors.Is(statErr, os.ErrNotExist)
@@ -57,7 +86,45 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("secure database file: %w", err)
 	}
-	store := &Store{db: db}
+	store := &Store{db: &DB{raw: db}, backend: "sqlite"}
+	if err := store.recoverInterruptedScans(context.Background()); err != nil {
+		db.Close()
+		return nil, err
+	}
+	return store, nil
+}
+
+func openPostgres(options PostgresOptions) (*Store, error) {
+	if options.Username == "" || options.Password == "" || options.Hostname == "" || options.Database == "" {
+		return nil, errors.New("PostgreSQL requires username, password, hostname, and database")
+	}
+	port, err := strconv.Atoi(options.Port)
+	if err != nil || port < 1 || port > 65535 {
+		return nil, errors.New("DATABASE_PORT must be between 1 and 65535")
+	}
+	sslMode := options.SSLMode
+	if sslMode == "" {
+		sslMode = "disable"
+	}
+	if sslMode != "disable" && sslMode != "require" && sslMode != "verify-ca" && sslMode != "verify-full" {
+		return nil, errors.New("DATABASE_SSLMODE must be disable, require, verify-ca, or verify-full")
+	}
+	dsn := (&url.URL{Scheme: "postgres", User: url.UserPassword(options.Username, options.Password), Host: options.Hostname + ":" + options.Port, Path: options.Database, RawQuery: "sslmode=" + sslMode}).String()
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("open PostgreSQL database: %w", err)
+	}
+	db.SetMaxOpenConns(16)
+	db.SetMaxIdleConns(4)
+	if err := db.Ping(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("connect PostgreSQL database: %w", err)
+	}
+	if err := applyPostgresSchema(context.Background(), db); err != nil {
+		db.Close()
+		return nil, err
+	}
+	store := &Store{db: &DB{raw: db, postgres: true}, backend: "postgres"}
 	if err := store.recoverInterruptedScans(context.Background()); err != nil {
 		db.Close()
 		return nil, err
@@ -66,6 +133,8 @@ func Open(path string) (*Store, error) {
 }
 
 func (s *Store) Close() error { return s.db.Close() }
+
+func (s *Store) Backend() string { return s.backend }
 
 func (s *Store) Ready(ctx context.Context) error { return s.db.PingContext(ctx) }
 
@@ -621,7 +690,7 @@ type DashboardStats struct {
 
 func (s *Store) DashboardStats(ctx context.Context) (DashboardStats, error) {
 	var stats DashboardStats
-	err := s.db.QueryRowContext(ctx, `SELECT count(*),coalesce(sum(online_status='online'),0),coalesce(sum(online_status='offline'),0),coalesce(sum(online_status='authentication_required'),0),coalesce(sum(room_id=1),0) FROM devices`).Scan(&stats.TotalDevices, &stats.OnlineDevices, &stats.OfflineDevices, &stats.AuthDevices, &stats.UnassignedDevices)
+	err := s.db.QueryRowContext(ctx, `SELECT count(*),coalesce(sum(CASE WHEN online_status='online' THEN 1 ELSE 0 END),0),coalesce(sum(CASE WHEN online_status='offline' THEN 1 ELSE 0 END),0),coalesce(sum(CASE WHEN online_status='authentication_required' THEN 1 ELSE 0 END),0),coalesce(sum(CASE WHEN room_id=1 THEN 1 ELSE 0 END),0) FROM devices`).Scan(&stats.TotalDevices, &stats.OnlineDevices, &stats.OfflineDevices, &stats.AuthDevices, &stats.UnassignedDevices)
 	if err != nil {
 		return stats, err
 	}
@@ -638,7 +707,7 @@ func (s *Store) DashboardStats(ctx context.Context) (DashboardStats, error) {
 }
 
 func (s *Store) DueScheduledNetworks(ctx context.Context, now time.Time) ([]Network, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT n.id,n.name,n.cidr,n.enabled,n.automatic_scan_enabled,n.scan_interval_seconds,n.scan_concurrency,n.connection_timeout_ms,n.request_timeout_ms,n.created_at,n.updated_at
+	query := `SELECT n.id,n.name,n.cidr,n.enabled,n.automatic_scan_enabled,n.scan_interval_seconds,n.scan_concurrency,n.connection_timeout_ms,n.request_timeout_ms,n.created_at,n.updated_at
 		FROM networks n
 		WHERE n.deleted_at IS NULL AND n.enabled=1 AND n.automatic_scan_enabled=1
 		AND NOT EXISTS (SELECT 1 FROM scans active WHERE active.network_id=n.id AND active.status IN ('queued','running'))
@@ -646,7 +715,16 @@ func (s *Store) DueScheduledNetworks(ctx context.Context, now time.Time) ([]Netw
 		 OR n.deleted_at IS NULL AND n.enabled=1 AND n.automatic_scan_enabled=1
 		AND NOT EXISTS (SELECT 1 FROM scans active WHERE active.network_id=n.id AND active.status IN ('queued','running'))
 		AND datetime((SELECT max(coalesce(completed_at,created_at)) FROM scans previous WHERE previous.network_id=n.id AND previous.trigger_type IN ('manual','scheduled')), '+' || n.scan_interval_seconds || ' seconds') <= datetime(?)
-		ORDER BY n.id`, timestamp(now))
+		ORDER BY n.id`
+	if s.backend == "postgres" {
+		query = `SELECT n.id,n.name,n.cidr,n.enabled,n.automatic_scan_enabled,n.scan_interval_seconds,n.scan_concurrency,n.connection_timeout_ms,n.request_timeout_ms,n.created_at,n.updated_at
+			FROM networks n WHERE n.deleted_at IS NULL AND n.enabled=1 AND n.automatic_scan_enabled=1
+			AND NOT EXISTS (SELECT 1 FROM scans active WHERE active.network_id=n.id AND active.status IN ('queued','running'))
+			AND ((SELECT max(coalesce(completed_at,created_at)) FROM scans previous WHERE previous.network_id=n.id AND previous.trigger_type IN ('manual','scheduled')) IS NULL
+			OR ((SELECT max(coalesce(completed_at,created_at)) FROM scans previous WHERE previous.network_id=n.id AND previous.trigger_type IN ('manual','scheduled'))::timestamptz + n.scan_interval_seconds * interval '1 second') <= ?::timestamptz)
+			ORDER BY n.id`
+	}
+	rows, err := s.db.QueryContext(ctx, query, timestamp(now))
 	if err != nil {
 		return nil, err
 	}

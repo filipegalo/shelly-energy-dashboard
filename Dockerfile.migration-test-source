@@ -1,0 +1,5 @@
+FROM alpine:3.21
+
+COPY shelly-inventory-pre-k3s-20260904T000000Z.tar.gz /input/source.tar.gz
+
+CMD ["sh", "-ec", "tar -xzf /input/source.tar.gz -C /source && chmod 0644 /source/data/shelly-inventory.db && touch /source/.ready && exec tail -f /dev/null"]

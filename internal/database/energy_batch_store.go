@@ -61,7 +61,7 @@ func (s *Store) ListLatestEnergySamplesForSources(ctx context.Context, sources [
 	query := `WITH requested(device_id,component_key) AS (VALUES ` + values + `),
 		ranked AS (
 			SELECT sample.id,sample.device_id,sample.component_key,sample.recorded_at,sample.power_w,sample.imported_energy_total_wh,sample.exported_energy_total_wh,sample.voltage_v,sample.current_a,sample.power_factor,sample.frequency_hz,sample.reading_quality,sample.created_at,
-				row_number() OVER (PARTITION BY sample.device_id,sample.component_key ORDER BY julianday(sample.recorded_at) DESC,sample.recorded_at DESC,sample.id DESC) AS source_rank
+				row_number() OVER (PARTITION BY sample.device_id,sample.component_key ORDER BY sample.recorded_at DESC,sample.id DESC) AS source_rank
 			FROM energy_samples sample
 			JOIN requested requested_source ON requested_source.device_id=sample.device_id AND requested_source.component_key=sample.component_key
 		)
@@ -107,7 +107,10 @@ func energySourceValues(sources []EnergySourceRef) (string, []any) {
 	placeholders := make([]string, 0, len(sources))
 	args := make([]any, 0, len(sources)*2)
 	for _, source := range sources {
-		placeholders = append(placeholders, `(?,?)`)
+		// Explicit casts keep PostgreSQL from inferring text for VALUES parameters
+		// before they are compared to the integer device_id column. SQLite accepts
+		// the same ANSI CAST syntax.
+		placeholders = append(placeholders, `(CAST(? AS INTEGER),CAST(? AS TEXT))`)
 		args = append(args, source.DeviceID, source.ComponentKey)
 	}
 	return strings.Join(placeholders, ","), args

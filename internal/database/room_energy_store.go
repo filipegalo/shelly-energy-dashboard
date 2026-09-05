@@ -73,7 +73,7 @@ func (s *Store) CreateRoomEnergyAssignment(ctx context.Context, assignment RoomE
 	return created, nil
 }
 
-func createRoomEnergyAssignment(ctx context.Context, tx *sql.Tx, assignment RoomEnergyAssignment) (RoomEnergyAssignment, error) {
+func createRoomEnergyAssignment(ctx context.Context, tx *Tx, assignment RoomEnergyAssignment) (RoomEnergyAssignment, error) {
 	assignment = normalizeRoomEnergyAssignment(assignment)
 	if err := validateRoomEnergyAssignment(ctx, tx, assignment); err != nil {
 		return RoomEnergyAssignment{}, err
@@ -110,7 +110,7 @@ func normalizeRoomEnergyAssignment(assignment RoomEnergyAssignment) RoomEnergyAs
 	return result
 }
 
-func validateRoomEnergyAssignment(ctx context.Context, tx *sql.Tx, assignment RoomEnergyAssignment) error {
+func validateRoomEnergyAssignment(ctx context.Context, tx *Tx, assignment RoomEnergyAssignment) error {
 	if assignment.RoomID < 1 || assignment.DeviceID < 1 || assignment.EffectiveFrom.IsZero() {
 		return ErrRoomEnergyInvalidAssignment
 	}
@@ -526,7 +526,7 @@ func (s *Store) UpdateRoomEnergyAssignmentDisplayName(ctx context.Context, id in
 	return nil
 }
 
-func roomEnergyParentHasChildrenAfter(ctx context.Context, tx *sql.Tx, parentID int64, boundary time.Time) (bool, error) {
+func roomEnergyParentHasChildrenAfter(ctx context.Context, tx *Tx, parentID int64, boundary time.Time) (bool, error) {
 	var exists bool
 	stamp := roomEnergyTimestamp(boundary)
 	err := tx.QueryRowContext(ctx, `SELECT EXISTS(
