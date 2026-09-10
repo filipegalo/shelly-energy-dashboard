@@ -15,6 +15,9 @@ type Metrics struct {
 	EnergyCollectorRequests               prometheus.Counter
 	EnergyCollectorErrors                 *prometheus.CounterVec
 	EnergyCollectorDuration               prometheus.Histogram
+	EnergyMainMeterConfigured             prometheus.Gauge
+	EnergyMainMeterOnline                 prometheus.Gauge
+	EnergyMainMeterPollIntervalSeconds    prometheus.Gauge
 	EnergyLastReading                     prometheus.Gauge
 	EnergyCurrentPower                    prometheus.Gauge
 	EnergyConsumptionKWh                  prometheus.Counter
@@ -48,6 +51,9 @@ func New() *Metrics {
 		EnergyCollectorRequests:               prometheus.NewCounter(prometheus.CounterOpts{Name: "shelly_energy_collector_requests_total", Help: "Energy meter collection requests."}),
 		EnergyCollectorErrors:                 prometheus.NewCounterVec(prometheus.CounterOpts{Name: "shelly_energy_collector_errors_total", Help: "Energy meter collection errors by bounded type."}, []string{"type"}),
 		EnergyCollectorDuration:               prometheus.NewHistogram(prometheus.HistogramOpts{Name: "shelly_energy_collector_request_duration_seconds", Help: "Duration of energy meter collection requests."}),
+		EnergyMainMeterConfigured:             prometheus.NewGauge(prometheus.GaugeOpts{Name: "shelly_energy_main_meter_configured", Help: "Whether whole-house energy collection is configured and enabled (1=yes, 0=no)."}),
+		EnergyMainMeterOnline:                 prometheus.NewGauge(prometheus.GaugeOpts{Name: "shelly_energy_main_meter_online", Help: "Whether the whole-house meter has a current successful reading (1=yes, 0=no)."}),
+		EnergyMainMeterPollIntervalSeconds:    prometheus.NewGauge(prometheus.GaugeOpts{Name: "shelly_energy_main_meter_poll_interval_seconds", Help: "Configured whole-house meter collection interval in seconds; 0 when disabled."}),
 		EnergyLastReading:                     prometheus.NewGauge(prometheus.GaugeOpts{Name: "shelly_energy_last_reading_timestamp_seconds", Help: "Unix timestamp of the last successful energy reading."}),
 		EnergyCurrentPower:                    prometheus.NewGauge(prometheus.GaugeOpts{Name: "shelly_energy_current_power_watts", Help: "Latest whole-house active power in watts."}),
 		EnergyConsumptionKWh:                  prometheus.NewCounter(prometheus.CounterOpts{Name: "shelly_energy_consumption_kwh_total", Help: "Whole-house consumption recorded by this process in kWh."}),
@@ -65,6 +71,6 @@ func New() *Metrics {
 		RoomEnergyAllocationErrors:            prometheus.NewCounter(prometheus.CounterOpts{Name: "shelly_room_energy_allocation_errors_total", Help: "Room cost-allocation failures."}),
 		RoomEnergyAggregationDuration:         prometheus.NewHistogram(prometheus.HistogramOpts{Name: "shelly_room_energy_aggregation_duration_seconds", Help: "Duration of room report aggregation and cost allocation."}),
 	}
-	registry.MustRegister(value.ScanDuration, value.ScanCount, value.AddressesScanned, value.DevicesDiscovered, value.NewDevices, value.APIRequestDuration, value.APIFailures, value.RunningScans, value.EnergyCollectorRequests, value.EnergyCollectorErrors, value.EnergyCollectorDuration, value.EnergyLastReading, value.EnergyCurrentPower, value.EnergyConsumptionKWh, value.EnergyCounterResets, value.EnergyMissingSamples, value.EnergyEstimatedCost, value.RoomEnergySourcesTotal, value.RoomEnergySourcesOnline, value.RoomEnergySourcesStale, value.RoomEnergyConsumptionKWh, value.RoomEnergyUnmeteredKWh, value.RoomEnergyCoverageRatio, value.RoomEnergyReconciliationDifferenceKWh, value.RoomEnergyReconciliationWarnings, value.RoomEnergyAllocationErrors, value.RoomEnergyAggregationDuration)
+	registry.MustRegister(value.ScanDuration, value.ScanCount, value.AddressesScanned, value.DevicesDiscovered, value.NewDevices, value.APIRequestDuration, value.APIFailures, value.RunningScans, value.EnergyCollectorRequests, value.EnergyCollectorErrors, value.EnergyCollectorDuration, value.EnergyMainMeterConfigured, value.EnergyMainMeterOnline, value.EnergyMainMeterPollIntervalSeconds, value.EnergyLastReading, value.EnergyCurrentPower, value.EnergyConsumptionKWh, value.EnergyCounterResets, value.EnergyMissingSamples, value.EnergyEstimatedCost, value.RoomEnergySourcesTotal, value.RoomEnergySourcesOnline, value.RoomEnergySourcesStale, value.RoomEnergyConsumptionKWh, value.RoomEnergyUnmeteredKWh, value.RoomEnergyCoverageRatio, value.RoomEnergyReconciliationDifferenceKWh, value.RoomEnergyReconciliationWarnings, value.RoomEnergyAllocationErrors, value.RoomEnergyAggregationDuration)
 	return value
 }

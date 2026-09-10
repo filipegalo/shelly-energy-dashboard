@@ -85,6 +85,19 @@ func TestSidebarShowsApplicationVersion(t *testing.T) {
 	}
 }
 
+func TestSidebarIsCollapsedWhenRequested(t *testing.T) {
+	t.Parallel()
+	router, store := testRouter(t)
+	defer store.Close()
+
+	if body := getPageBody(t, router, "/?range=24h&sidebar=closed"); !strings.Contains(body, `<div class="shell sidebar-collapsed">`) {
+		t.Fatalf("sidebar=closed does not collapse the sidebar: %s", body)
+	}
+	if body := getPageBody(t, router, "/?range=24h"); strings.Contains(body, "sidebar-collapsed") {
+		t.Fatalf("range alone unexpectedly collapses the sidebar: %s", body)
+	}
+}
+
 func TestDashboardEnergyFirstOnboardingPreservesShellyActions(t *testing.T) {
 	t.Parallel()
 	router, store := testRouter(t)

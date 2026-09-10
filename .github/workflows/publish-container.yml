@@ -112,3 +112,12 @@ jobs:
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
           create-storage-record: false
+
+      - name: Update homelab image version
+        uses: filipegalo/actions/update-image-version@v1
+        with:
+          repository: filipegalo/homelab
+          token: ${{ secrets.PAT_TOKEN }}
+          file-path: k8s/components/home-energy/values/base.yaml
+          image-repositories: ghcr.io/filipegalo/shelly-energy-dashboard
+          version: ${{ steps.metadata.outputs.version }}

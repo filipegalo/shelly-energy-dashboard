@@ -536,6 +536,21 @@ func (m *Manager) publish(state LiveState) {
 func (m *Manager) publishMainLocked(state LiveState) {
 	state = cloneLiveState(state)
 	m.latest = state
+	if m.metrics != nil {
+		configured := state.Configured && state.Enabled
+		if configured {
+			m.metrics.EnergyMainMeterConfigured.Set(1)
+			m.metrics.EnergyMainMeterPollIntervalSeconds.Set(float64(state.PollIntervalSeconds))
+		} else {
+			m.metrics.EnergyMainMeterConfigured.Set(0)
+			m.metrics.EnergyMainMeterPollIntervalSeconds.Set(0)
+		}
+		if configured && state.Online && !state.Stale {
+			m.metrics.EnergyMainMeterOnline.Set(1)
+		} else {
+			m.metrics.EnergyMainMeterOnline.Set(0)
+		}
+	}
 	if m.subscribers == nil {
 		m.subscribers = make(map[chan LiveState]struct{})
 	}

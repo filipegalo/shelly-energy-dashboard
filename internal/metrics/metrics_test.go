@@ -16,6 +16,9 @@ func TestNewRegistersCollectors(t *testing.T) {
 	metrics.EnergyCollectorRequests.Inc()
 	metrics.EnergyCollectorErrors.WithLabelValues("timeout").Inc()
 	metrics.EnergyCollectorDuration.Observe(.2)
+	metrics.EnergyMainMeterConfigured.Set(1)
+	metrics.EnergyMainMeterOnline.Set(1)
+	metrics.EnergyMainMeterPollIntervalSeconds.Set(30)
 	metrics.EnergyLastReading.Set(1)
 	metrics.EnergyCurrentPower.Set(250)
 	metrics.EnergyConsumptionKWh.Add(.5)
@@ -36,7 +39,7 @@ func TestNewRegistersCollectors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(values) != 27 {
+	if len(values) != 30 {
 		t.Fatalf("gathered %d metric families", len(values))
 	}
 }

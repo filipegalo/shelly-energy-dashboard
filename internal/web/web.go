@@ -51,23 +51,24 @@ type Server struct {
 }
 
 type viewData struct {
-	Page        string
-	Title       string
-	CSRF        string
-	Error       string
-	Stats       database.DashboardStats
-	Networks    []database.Network
-	Rooms       []database.Room
-	Devices     []database.Device
-	Device      database.Device
-	Room        database.Room
-	Scans       []database.Scan
-	Scan        database.Scan
-	Credentials []database.CredentialProfile
-	Query       map[string]string
-	Energy      energyView
-	RoomEnergy  *roomEnergyViewModel
-	Version     string
+	Page             string
+	Title            string
+	CSRF             string
+	Error            string
+	Stats            database.DashboardStats
+	Networks         []database.Network
+	Rooms            []database.Room
+	Devices          []database.Device
+	Device           database.Device
+	Room             database.Room
+	Scans            []database.Scan
+	Scan             database.Scan
+	Credentials      []database.CredentialProfile
+	Query            map[string]string
+	Energy           energyView
+	RoomEnergy       *roomEnergyViewModel
+	Version          string
+	SidebarCollapsed bool
 }
 
 func New(store *database.Store, manager *scans.Manager, cfg config.Config, logger *slog.Logger, cipher *credentials.Cipher, registryHandler http.Handler) (*Server, error) {
@@ -565,6 +566,7 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 func (s *Server) render(w http.ResponseWriter, r *http.Request, data viewData) {
 	data.CSRF = csrfToken(r)
 	data.Version = s.version
+	data.SidebarCollapsed = r.URL.Query().Get("sidebar") == "closed"
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.views.ExecuteTemplate(w, "app.html", data); err != nil {
 		s.logger.Error("render response", "operation", "template", "error", err)

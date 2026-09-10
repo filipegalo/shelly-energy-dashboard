@@ -23,7 +23,9 @@ See [Configuration](configuration.md) for network routing and [Security](securit
 
 Discovery metrics cover scan counts and durations by terminal status, addresses scanned, discovered and new devices, local API durations and failures, device state gauges, and running scans.
 
-Energy metrics cover request count, duration, and errors; latest-reading time; live watts; process-recorded kWh; reset and missing-sample counters; and current billing-cycle variable-cost estimate.
+Energy metrics cover request count, duration, and errors; latest-reading time; live watts; process-recorded kWh; reset and missing-sample counters; and current billing-cycle variable-cost estimate. The main meter additionally exports whether collection is configured (`shelly_energy_main_meter_configured`), whether its latest reading is current (`shelly_energy_main_meter_online`), and its polling interval (`shelly_energy_main_meter_poll_interval_seconds`).
+
+To alert when a configured main Shelly meter stops producing readings, load [`prometheus-alerts.yml`](prometheus-alerts.yml) into Prometheus. The rule uses the configured poll interval and also fires after a process restart if no successful reading arrives.
 
 Room metrics cover selected, online, and stale sources plus aggregation, coverage, unmetered energy, reconciliation, and allocation health.
 

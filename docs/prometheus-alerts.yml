@@ -1,0 +1,17 @@
+groups:
+  - name: shelly-energy-dashboard
+    rules:
+      - alert: ShellyMainMeterNotProducingData
+        expr: |
+          (shelly_energy_main_meter_configured == 1)
+          and on (job, instance)
+          (
+            time() - shelly_energy_last_reading_timestamp_seconds
+            > (3 * shelly_energy_main_meter_poll_interval_seconds + 30)
+          )
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Shelly main meter is not producing energy data
+          description: The configured main meter has not produced a successful reading for more than three polling intervals plus 30 seconds.

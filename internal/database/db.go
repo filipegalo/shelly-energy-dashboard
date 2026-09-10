@@ -34,7 +34,9 @@ func (d *DB) ExecContext(ctx context.Context, q string, a ...any) (sql.Result, e
 }
 func (d *DB) QueryContext(ctx context.Context, q string, a ...any) (*sql.Rows, error) {
 	rows, err := d.raw.QueryContext(ctx, bind(d.postgres, q), postgresArgs(d.postgres, a)...)
-	if err != nil { return nil, fmt.Errorf("query %q: %w", q, err) }
+	if err != nil {
+		return nil, fmt.Errorf("query %q: %w", q, err)
+	}
 	return rows, nil
 }
 func (d *DB) QueryRowContext(ctx context.Context, q string, a ...any) *sql.Row {

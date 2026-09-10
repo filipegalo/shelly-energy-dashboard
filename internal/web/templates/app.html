@@ -16,7 +16,7 @@
   <script defer src="/static/js/app.js"></script>
 </head>
 <body>
-<div class="shell">
+<div class="shell{{if .SidebarCollapsed}} sidebar-collapsed{{end}}">
   <aside class="sidebar">
     <a class="brand" href="/"><span class="brand-mark">S</span><span><strong>Shelly Inventory</strong><small>Local home energy</small></span></a>
     <nav aria-label="Primary navigation">
