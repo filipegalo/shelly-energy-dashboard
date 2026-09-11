@@ -113,6 +113,10 @@ jobs:
           push-to-registry: true
           create-storage-record: false
 
+      - name: Select immutable image tag
+        id: image_tag
+        run: echo "version=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
       - name: Update homelab image version
         uses: filipegalo/actions/update-image-version@v1
         with:
@@ -120,4 +124,4 @@ jobs:
           token: ${{ secrets.PAT_TOKEN }}
           file-path: k8s/components/home-energy/values/base.yaml
           image-repositories: ghcr.io/filipegalo/shelly-energy-dashboard
-          version: ${{ steps.metadata.outputs.version }}
+          version: ${{ steps.image_tag.outputs.version }}
