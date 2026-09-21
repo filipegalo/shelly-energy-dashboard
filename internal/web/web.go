@@ -67,6 +67,7 @@ type viewData struct {
 	Query            map[string]string
 	Energy           energyView
 	RoomEnergy       *roomEnergyViewModel
+	Reports          *reportsView
 	Version          string
 	SidebarCollapsed bool
 }
@@ -183,6 +184,8 @@ func (s *Server) Router() http.Handler {
 	router.Get("/settings", s.settingsPage)
 	router.Post("/settings/credentials", s.createCredential)
 	router.Get("/energy", s.energyPage)
+	router.Get("/reports", s.reportsPage)
+	router.Post("/reports/invoice", s.saveInvoiceReconciliation)
 	router.Get("/energy/settings", s.energySettingsPage)
 	router.Get("/energy/history", s.energyHistory)
 	router.Get("/energy/pricing-preview", s.energyPricingPreview)

@@ -162,6 +162,22 @@ BEGIN
 END;
 `,
 	},
+	{
+		version: 4,
+		sql: `
+CREATE TABLE invoice_reconciliations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  cycle_start TEXT NOT NULL,
+  cycle_end TEXT NOT NULL,
+  variable_cost_eur TEXT NOT NULL DEFAULT '0',
+  fixed_cost_eur TEXT NOT NULL DEFAULT '0',
+  total_cost_eur TEXT NOT NULL DEFAULT '0',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(cycle_start, cycle_end)
+);
+`,
+	},
 }
 
 func applySchemaMigrations(ctx context.Context, db *sql.DB) error {

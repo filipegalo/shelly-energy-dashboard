@@ -24,6 +24,7 @@
         <span class="nav-label">Energy</span>
         <a href="/" class="{{if eq .Page "dashboard"}}active{{end}}" {{if eq .Page "dashboard"}}aria-current="page"{{end}}>Overview</a>
         <a href="/energy" class="{{if eq .Page "energy"}}active{{end}}" {{if eq .Page "energy"}}aria-current="page"{{end}}>Whole House</a>
+		<a href="/reports" class="{{if eq .Page "reports"}}active{{end}}" {{if eq .Page "reports"}}aria-current="page"{{end}}>Reports</a>
         <a href="/energy/rooms" class="{{if or (eq .Page "energy-rooms") (eq .Page "energy-room")}}active{{end}}" {{if or (eq .Page "energy-rooms") (eq .Page "energy-room")}}aria-current="page"{{end}}>Rooms</a>
         <a href="/energy/rooms/reconciliation" class="{{if eq .Page "energy-reconciliation"}}active{{end}}" {{if eq .Page "energy-reconciliation"}}aria-current="page"{{end}}>Reconciliation</a>
         <a href="/energy/settings" class="{{if or (eq .Page "energy-settings") (eq .Page "energy-room-settings")}}active{{end}}" {{if or (eq .Page "energy-settings") (eq .Page "energy-room-settings")}}aria-current="page"{{end}}>Energy Settings</a>
@@ -55,6 +56,7 @@
     {{if eq .Page "room"}}{{template "room" .}}{{end}}
     {{if eq .Page "networks"}}{{template "networks" .}}{{end}}
     {{if eq .Page "energy"}}{{template "energy" .}}{{end}}
+	{{if eq .Page "reports"}}{{template "reports" .}}{{end}}
     {{if eq .Page "energy-settings"}}{{template "energy-settings" .}}{{end}}
     {{if eq .Page "energy-rooms"}}{{template "energy-rooms" .}}{{end}}
     {{if eq .Page "energy-room"}}{{template "energy-room" .}}{{end}}

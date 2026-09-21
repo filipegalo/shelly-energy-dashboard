@@ -26,6 +26,7 @@ func TestSidebarGroupsEnergyBeforeShellyManagement(t *testing.T) {
 		"Energy",
 		"Overview",
 		"Whole House",
+		"Reports",
 		"Rooms",
 		"Reconciliation",
 		"Energy Settings",
@@ -42,6 +43,7 @@ func TestSidebarGroupsEnergyBeforeShellyManagement(t *testing.T) {
 	wantLinks := map[string]string{
 		"/":                            "Overview",
 		"/energy":                      "Whole House",
+		"/reports":                     "Reports",
 		"/energy/rooms":                "Rooms",
 		"/energy/rooms/reconciliation": "Reconciliation",
 		"/energy/settings":             "Energy Settings",
@@ -64,6 +66,27 @@ func TestSidebarGroupsEnergyBeforeShellyManagement(t *testing.T) {
 	}
 	if !strings.Contains(nav, `href="/" class="active" aria-current="page"`) {
 		t.Error("active overview link does not expose aria-current")
+	}
+}
+
+func TestReportsPageShowsFiveDecisionReports(t *testing.T) {
+	t.Parallel()
+	router, store := testRouter(t)
+	defer store.Close()
+	seedDashboardEnergyReading(t, store, 850)
+
+	body := getPageBody(t, router, "/reports")
+	for _, want := range []string{
+		"01 · PERIOD COMPARISON",
+		"02 · CONSUMPTION PROFILE",
+		"03 · BILLING RECONCILIATION",
+		"04 · ROOM ATTRIBUTION & COVERAGE",
+		"05 · DATA QUALITY & AUDIT TRAIL",
+		"Save invoice",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("reports page does not contain %q", want)
+		}
 	}
 }
 

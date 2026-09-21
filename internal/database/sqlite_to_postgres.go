@@ -36,12 +36,12 @@ func MigrateSQLiteToPostgres(ctx context.Context, sqlitePath string, postgres Po
 		return err
 	}
 	defer tx.Rollback()
-	tables := []string{"room_energy_assignments", "meter_events", "energy_interval_aggregates", "energy_samples", "electricity_pricing_versions", "room_energy_config", "energy_config", "scans", "devices", "credential_profiles", "networks", "rooms", "schema_migrations"}
+	tables := []string{"invoice_reconciliations", "room_energy_assignments", "meter_events", "energy_interval_aggregates", "energy_samples", "electricity_pricing_versions", "room_energy_config", "energy_config", "scans", "devices", "credential_profiles", "networks", "rooms", "schema_migrations"}
 	if _, err := tx.ExecContext(ctx, "TRUNCATE TABLE "+strings.Join(tables, ",")+" RESTART IDENTITY CASCADE"); err != nil {
 		return fmt.Errorf("empty PostgreSQL target: %w", err)
 	}
 	// Parent-to-child order is required because the target enforces foreign keys.
-	for _, table := range []string{"rooms", "networks", "credential_profiles", "devices", "scans", "energy_config", "room_energy_config", "electricity_pricing_versions", "energy_samples", "energy_interval_aggregates", "meter_events", "room_energy_assignments", "schema_migrations"} {
+	for _, table := range []string{"rooms", "networks", "credential_profiles", "devices", "scans", "energy_config", "room_energy_config", "electricity_pricing_versions", "energy_samples", "energy_interval_aggregates", "meter_events", "room_energy_assignments", "invoice_reconciliations", "schema_migrations"} {
 		if err := copySQLiteTable(ctx, source, tx, table); err != nil {
 			return err
 		}
