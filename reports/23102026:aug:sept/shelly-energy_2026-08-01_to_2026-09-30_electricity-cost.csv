@@ -1,0 +1,4 @@
+month,grid_import_kwh,reduced_vat_kwh,standard_vat_kwh,energy_net_eur,energy_vat_eur,excise_tax_net_eur,excise_tax_vat_eur,variable_cost_incl_vat_eur,avg_import_price_eur_per_kwh
+2026-08,701.511,285.176,416.335,96.3722,15.5055,0.7015,0.1613,112.7406,0.160711
+2026-09,756.536,200.000,556.536,103.9313,19.2334,0.7565,0.1740,124.0952,0.164031
+TOTAL,1458.047,485.176,972.871,200.3035,34.7389,1.4580,0.3354,236.8358,0.162434
