@@ -186,6 +186,7 @@ func (s *Server) Router() http.Handler {
 	router.Get("/energy", s.energyPage)
 	router.Get("/reports", s.reportsPage)
 	router.Post("/reports/invoice", s.saveInvoiceReconciliation)
+	router.Get("/reports/export", s.exportReports)
 	router.Get("/energy/settings", s.energySettingsPage)
 	router.Get("/energy/history", s.energyHistory)
 	router.Get("/energy/pricing-preview", s.energyPricingPreview)

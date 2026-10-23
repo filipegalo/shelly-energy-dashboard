@@ -82,6 +82,7 @@ func TestReportsPageShowsFiveDecisionReports(t *testing.T) {
 		"03 · BILLING RECONCILIATION",
 		"04 · ROOM ATTRIBUTION & COVERAGE",
 		"05 · DATA QUALITY & AUDIT TRAIL",
+		"07 · DATA EXPORT",
 		"Save invoice",
 	} {
 		if !strings.Contains(body, want) {

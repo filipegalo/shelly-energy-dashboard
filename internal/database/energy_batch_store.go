@@ -8,7 +8,10 @@ import (
 	"time"
 )
 
-const maximumBatchedEnergySources = 1000
+const (
+	maximumBatchedEnergySources = 1000
+	maximumAggregateDuration    = 25 * time.Hour
+)
 
 type EnergySourceRef struct {
 	DeviceID     int64
@@ -28,12 +31,15 @@ func (s *Store) ListEnergyAggregatesForSources(ctx context.Context, sources []En
 	}
 
 	values, args := energySourceValues(unique)
-	args = append(args, intervalType, timestamp(end), timestamp(start))
+	// No aggregate is longer than a 25-hour DST day, so the extra lower bound on
+	// interval_start keeps overlap semantics while letting the index skip all
+	// earlier history.
+	args = append(args, intervalType, timestamp(start.Add(-maximumAggregateDuration)), timestamp(end), timestamp(start))
 	query := `WITH requested(device_id,component_key) AS (VALUES ` + values + `)
 		SELECT a.id,a.interval_type,a.interval_start,a.interval_end,a.device_id,a.component_key,a.energy_consumed_wh,a.average_power_w,a.minimum_power_w,a.maximum_power_w,a.sample_count,a.missing_sample_count,a.calculation_quality,a.created_at,a.updated_at
 		FROM energy_interval_aggregates a
 		JOIN requested requested_source ON requested_source.device_id=a.device_id AND requested_source.component_key=a.component_key
-		WHERE a.interval_type=? AND a.interval_start<? AND a.interval_end>?
+		WHERE a.interval_type=? AND a.interval_start>? AND a.interval_start<? AND a.interval_end>?
 		ORDER BY a.device_id,a.component_key,a.interval_start`
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {

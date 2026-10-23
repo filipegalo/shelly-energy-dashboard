@@ -1,6 +1,8 @@
 package web
 
 import (
+	"archive/zip"
+	"context"
 	"errors"
 	"net/http"
 	"sort"
@@ -8,6 +10,7 @@ import (
 	"time"
 
 	"github.com/filipegalo/shelly-energy-dashboard/internal/database"
+	energyservice "github.com/filipegalo/shelly-energy-dashboard/internal/energy"
 	"github.com/shopspring/decimal"
 )
 
@@ -26,6 +29,7 @@ type reportsView struct {
 	Invoice                                                    database.InvoiceReconciliation
 	InvoiceSaved                                               bool
 	EstimateVariable, EstimateTotal, VariableDelta, TotalDelta string
+	ExportStart, ExportEnd                                     string
 }
 
 type reportProfileHour struct{ Hour, Energy, Peak string }
@@ -69,6 +73,9 @@ func (s *Server) buildReports(r *http.Request) (reportsView, error) {
 		return reportsView{}, err
 	}
 	view.Start, view.End = start, end
+	if exportStart, exportEnd, exportErr := s.exportRange(r.Context(), config, now, "", ""); exportErr == nil {
+		view.ExportStart, view.ExportEnd = exportStart.Format(time.DateOnly), exportEnd.AddDate(0, 0, -1).Format(time.DateOnly)
+	}
 	view.Current, err = s.energySummary(r, config, start, end, interval)
 	if err != nil {
 		return reportsView{}, err
@@ -287,4 +294,105 @@ func (s *Server) saveInvoiceReconciliation(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	http.Redirect(w, r, "/reports?range=billing&saved=1", http.StatusSeeOther)
+}
+
+// exportReports streams CSV exports straight to the response so a year of
+// 15-minute rows never has to be held in memory. Once streaming starts a
+// failure can only truncate the download, so it is logged.
+func (s *Server) exportReports(w http.ResponseWriter, r *http.Request) {
+	config, err := s.store.GetEnergyConfig(r.Context())
+	if err != nil {
+		s.serverError(w, r, err)
+		return
+	}
+	if !roomEnergyConfigured(config) {
+		s.formError(w, r, errors.New("configure a whole-house meter before exporting reports"))
+		return
+	}
+	now, _, err := roomEnergyNow(config)
+	if err != nil {
+		s.formError(w, r, err)
+		return
+	}
+	start, end, err := s.exportRange(r.Context(), config, now, r.URL.Query().Get("start"), r.URL.Query().Get("end"))
+	if err != nil {
+		s.formError(w, r, err)
+		return
+	}
+	export, err := energyservice.NewExport(r.Context(), s.store, config, start, end)
+	if err != nil {
+		s.formError(w, r, err)
+		return
+	}
+	prefix := "shelly-energy_" + start.Format(time.DateOnly) + "_to_" + end.AddDate(0, 0, -1).Format(time.DateOnly) + "_"
+	report := r.URL.Query().Get("report")
+	w.Header().Set("Cache-Control", "no-store")
+	if report == "all" {
+		w.Header().Set("Content-Type", "application/zip")
+		w.Header().Set("Content-Disposition", `attachment; filename="`+prefix+`solar-analysis.zip"`)
+		archive := zip.NewWriter(w)
+		for _, file := range export.Files() {
+			part, createErr := archive.CreateHeader(&zip.FileHeader{Name: prefix + file.Name, Method: zip.Deflate, Modified: export.GeneratedAt})
+			if createErr == nil {
+				createErr = file.Write(r.Context(), part)
+			}
+			if createErr != nil {
+				s.logger.Error("report export failed", "operation", "report_export", "report", file.Key, "error", createErr)
+				return
+			}
+		}
+		if err := archive.Close(); err != nil {
+			s.logger.Error("report export failed", "operation", "report_export", "report", report, "error", err)
+		}
+		return
+	}
+	for _, file := range export.Files() {
+		if file.Key != report {
+			continue
+		}
+		contentType := "text/csv; charset=utf-8"
+		if strings.HasSuffix(file.Name, ".txt") {
+			contentType = "text/plain; charset=utf-8"
+		}
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Content-Disposition", `attachment; filename="`+prefix+file.Name+`"`)
+		if err := file.Write(r.Context(), w); err != nil {
+			s.logger.Error("report export failed", "operation", "report_export", "report", report, "error", err)
+		}
+		return
+	}
+	s.formError(w, r, errors.New("unknown report export"))
+}
+
+// exportRange returns whole local days [start, end) that end no later than
+// today, so an export never contains a partially elapsed day. Without dates it
+// covers the last 12 months, or all history when that is shorter.
+func (s *Server) exportRange(ctx context.Context, config database.EnergyConfig, now time.Time, startText, endText string) (time.Time, time.Time, error) {
+	location := now.Location()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, location)
+	start, end := today.AddDate(-1, 0, 0), today
+	if first, err := s.store.EnergyHistoryStart(ctx, config.DeviceID, config.ComponentKey); err == nil {
+		first = first.In(location)
+		if day := time.Date(first.Year(), first.Month(), first.Day(), 0, 0, 0, 0, location); day.After(start) {
+			start = day
+		}
+	}
+	if startText != "" {
+		parsed, err := time.ParseInLocation(time.DateOnly, startText, location)
+		if err != nil {
+			return time.Time{}, time.Time{}, errors.New("export start must be a valid date")
+		}
+		start = parsed
+	}
+	if endText != "" {
+		parsed, err := time.ParseInLocation(time.DateOnly, endText, location)
+		if err != nil {
+			return time.Time{}, time.Time{}, errors.New("export end must be a valid date")
+		}
+		end = parsed.AddDate(0, 0, 1)
+	}
+	if end.After(today) {
+		end = today
+	}
+	return start, end, nil
 }
